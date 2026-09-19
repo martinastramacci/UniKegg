@@ -1,0 +1,4 @@
+# SQLFluff 4.3 cannot parse comma-separated SET assignments in LOAD DATA.
+# tools/lint_ingest.py checks every assignment with the same MySQL dialect.
+# Docker integration executes the unchanged complete ingestion statements.
+db/load/001_ingest.sql

@@ -1,0 +1,37 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cnf
+
+# Upstream data and database exports are distributed separately.
+data/raw/**
+!data/raw/.gitkeep
+data/processed/**
+!data/processed/.gitkeep
+data/manifests/**
+!data/manifests/.gitkeep
+artifacts/**
+!artifacts/.gitkeep
+*.sql.gz
+*.dump
+dump*.sql
+*.zip
+
+# Runtime/build output
+.venv/
+tests/fixtures/processed/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.log
+.coverage
+htmlcov/
+.DS_Store
+Thumbs.db

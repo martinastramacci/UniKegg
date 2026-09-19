@@ -1,0 +1,57 @@
+name: Validate UniKegg
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pip install --no-deps -e .
+      - run: ruff check src tests tools
+      - run: sqlfluff lint db --dialect mysql
+      - run: python tools/lint_ingest.py
+      - run: pytest -q
+
+  mysql-integration:
+    needs: lint-and-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      UNIKEGG_PROCESSED_DIR: ./tests/fixtures/processed
+      UNIKEGG_DATASET_KIND: synthetic
+      MYSQL_PASSWORD: ci-ephemeral-only
+      MYSQL_ROOT_PASSWORD: ci-root-ephemeral-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate independent synthetic data
+        run: PYTHONPATH=src python tests/make_fixture.py
+      - run: docker compose config --quiet
+      - run: docker compose up --build -d
+      - name: Require successful automatic ingestion
+        run: docker compose wait etl
+      - name: Verify schema, data and repeat-load behavior
+        run: |
+          docker compose run --rm etl verify
+          docker compose run --rm etl load
+      - name: Container logs
+        if: always()
+        run: docker compose logs --no-color
+      - name: Remove ephemeral CI resources
+        if: always()
+        run: docker compose down --volumes --remove-orphans

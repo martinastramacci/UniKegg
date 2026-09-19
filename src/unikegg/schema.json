@@ -1,0 +1,553 @@
+[
+  {
+    "name": "ORGANISMO",
+    "file": "organismo.tsv",
+    "columns": [
+      "organism_id",
+      "kegg_code",
+      "taxonomy_id",
+      "scientific_name"
+    ],
+    "pk": [
+      "organism_id"
+    ],
+    "nullable": [],
+    "fk": [],
+    "specs": {
+      "organism_id": "INT UNSIGNED PRIMARY KEY",
+      "kegg_code": "VARCHAR(5) NOT NULL UNIQUE",
+      "taxonomy_id": "INT UNSIGNED NOT NULL UNIQUE",
+      "scientific_name": "VARCHAR(200) NOT NULL"
+    }
+  },
+  {
+    "name": "ORTOLOGIA_KEGG",
+    "file": "ortologia_kegg.tsv",
+    "columns": [
+      "ko_id",
+      "name",
+      "definition"
+    ],
+    "pk": [
+      "ko_id"
+    ],
+    "nullable": [
+      "name",
+      "definition"
+    ],
+    "fk": [],
+    "specs": {
+      "ko_id": "CHAR(6) PRIMARY KEY",
+      "name": "VARCHAR(300)",
+      "definition": "TEXT"
+    }
+  },
+  {
+    "name": "PATHWAY_RIFERIMENTO",
+    "file": "pathway_riferimento.tsv",
+    "columns": [
+      "map_id",
+      "name"
+    ],
+    "pk": [
+      "map_id"
+    ],
+    "nullable": [],
+    "fk": [],
+    "specs": {
+      "map_id": "CHAR(8) PRIMARY KEY",
+      "name": "VARCHAR(500) NOT NULL"
+    }
+  },
+  {
+    "name": "REAZIONE_KEGG",
+    "file": "reazione_kegg.tsv",
+    "columns": [
+      "reaction_id",
+      "name",
+      "definition",
+      "equation"
+    ],
+    "pk": [
+      "reaction_id"
+    ],
+    "nullable": [
+      "name",
+      "definition",
+      "equation"
+    ],
+    "fk": [],
+    "specs": {
+      "reaction_id": "CHAR(6) PRIMARY KEY",
+      "name": "TEXT",
+      "definition": "TEXT",
+      "equation": "TEXT"
+    }
+  },
+  {
+    "name": "COMPOSTO_KEGG",
+    "file": "composto_kegg.tsv",
+    "columns": [
+      "compound_id",
+      "name",
+      "formula",
+      "exact_mass",
+      "molecular_weight"
+    ],
+    "pk": [
+      "compound_id"
+    ],
+    "nullable": [
+      "formula",
+      "exact_mass",
+      "molecular_weight"
+    ],
+    "fk": [],
+    "specs": {
+      "compound_id": "CHAR(6) PRIMARY KEY",
+      "name": "TEXT NOT NULL",
+      "formula": "VARCHAR(500)",
+      "exact_mass": "DECIMAL(24,10)",
+      "molecular_weight": "DECIMAL(24,10)"
+    }
+  },
+  {
+    "name": "TERMINE_GO",
+    "file": "termine_go.tsv",
+    "columns": [
+      "go_id",
+      "name",
+      "namespace"
+    ],
+    "pk": [
+      "go_id"
+    ],
+    "nullable": [],
+    "fk": [],
+    "specs": {
+      "go_id": "CHAR(10) PRIMARY KEY",
+      "name": "VARCHAR(500) NOT NULL",
+      "namespace": "ENUM('BP','MF','CC') NOT NULL"
+    }
+  },
+  {
+    "name": "NUMERO_EC",
+    "file": "numero_ec.tsv",
+    "columns": [
+      "ec_number"
+    ],
+    "pk": [
+      "ec_number"
+    ],
+    "nullable": [],
+    "fk": [],
+    "specs": {
+      "ec_number": "VARCHAR(20) PRIMARY KEY"
+    }
+  },
+  {
+    "name": "GENE_KEGG",
+    "file": "gene_kegg.tsv",
+    "columns": [
+      "kegg_gene_id",
+      "organism_id",
+      "gene_type",
+      "symbol",
+      "definition"
+    ],
+    "pk": [
+      "kegg_gene_id"
+    ],
+    "nullable": [
+      "symbol",
+      "definition"
+    ],
+    "fk": [
+      {
+        "column": "organism_id",
+        "parent": "ORGANISMO",
+        "target": "organism_id"
+      }
+    ],
+    "specs": {
+      "kegg_gene_id": "VARCHAR(40) PRIMARY KEY",
+      "organism_id": "INT UNSIGNED NOT NULL",
+      "gene_type": "VARCHAR(16) NOT NULL",
+      "symbol": "VARCHAR(255)",
+      "definition": "TEXT"
+    }
+  },
+  {
+    "name": "PROTEIN_UNIPROT",
+    "file": "protein_uniprot.tsv",
+    "columns": [
+      "accession",
+      "organism_id",
+      "entry_name",
+      "protein_name",
+      "sequence_length",
+      "molecular_mass",
+      "protein_existence",
+      "sequence_version",
+      "amino_acid_sequence"
+    ],
+    "pk": [
+      "accession"
+    ],
+    "nullable": [
+      "protein_name"
+    ],
+    "fk": [
+      {
+        "column": "organism_id",
+        "parent": "ORGANISMO",
+        "target": "organism_id"
+      }
+    ],
+    "specs": {
+      "accession": "VARCHAR(10) PRIMARY KEY",
+      "organism_id": "INT UNSIGNED NOT NULL",
+      "entry_name": "VARCHAR(30) NOT NULL UNIQUE",
+      "protein_name": "TEXT",
+      "sequence_length": "INT UNSIGNED NOT NULL",
+      "molecular_mass": "INT UNSIGNED NOT NULL",
+      "protein_existence": "VARCHAR(50) NOT NULL",
+      "sequence_version": "INT UNSIGNED NOT NULL",
+      "amino_acid_sequence": "MEDIUMTEXT NOT NULL"
+    }
+  },
+  {
+    "name": "PATHWAY_ORGANISMO",
+    "file": "pathway_organismo.tsv",
+    "columns": [
+      "pathway_id",
+      "organism_id",
+      "map_id"
+    ],
+    "pk": [
+      "pathway_id"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "organism_id",
+        "parent": "ORGANISMO",
+        "target": "organism_id"
+      },
+      {
+        "column": "map_id",
+        "parent": "PATHWAY_RIFERIMENTO",
+        "target": "map_id"
+      }
+    ],
+    "specs": {
+      "pathway_id": "VARCHAR(12) PRIMARY KEY",
+      "organism_id": "INT UNSIGNED NOT NULL",
+      "map_id": "CHAR(8) NOT NULL"
+    }
+  },
+  {
+    "name": "PROTEIN_ISOFORM",
+    "file": "protein_isoform.tsv",
+    "columns": [
+      "isoform_id",
+      "accession",
+      "ordinal",
+      "name",
+      "sequence_status",
+      "note"
+    ],
+    "pk": [
+      "isoform_id"
+    ],
+    "nullable": [
+      "note"
+    ],
+    "fk": [
+      {
+        "column": "accession",
+        "parent": "PROTEIN_UNIPROT",
+        "target": "accession"
+      }
+    ],
+    "specs": {
+      "isoform_id": "VARCHAR(25) PRIMARY KEY",
+      "accession": "VARCHAR(10) NOT NULL",
+      "ordinal": "INT UNSIGNED NOT NULL",
+      "name": "VARCHAR(500) NOT NULL",
+      "sequence_status": "ENUM('DISPLAYED','EXTERNAL','NOT_DESCRIBED','DESCRIBED') NOT NULL",
+      "note": "TEXT"
+    }
+  },
+  {
+    "name": "GENE_PROTEINA",
+    "file": "gene_proteina.tsv",
+    "columns": [
+      "kegg_gene_id",
+      "accession",
+      "mapping_source"
+    ],
+    "pk": [
+      "kegg_gene_id",
+      "accession",
+      "mapping_source"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "kegg_gene_id",
+        "parent": "GENE_KEGG",
+        "target": "kegg_gene_id"
+      },
+      {
+        "column": "accession",
+        "parent": "PROTEIN_UNIPROT",
+        "target": "accession"
+      }
+    ],
+    "specs": {
+      "kegg_gene_id": "VARCHAR(40)",
+      "accession": "VARCHAR(10)",
+      "mapping_source": "ENUM('KEGG_CONV','UNIPROT_DR') NOT NULL"
+    }
+  },
+  {
+    "name": "GENE_ORTOLOGIA",
+    "file": "gene_ortologia.tsv",
+    "columns": [
+      "kegg_gene_id",
+      "ko_id"
+    ],
+    "pk": [
+      "kegg_gene_id",
+      "ko_id"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "kegg_gene_id",
+        "parent": "GENE_KEGG",
+        "target": "kegg_gene_id"
+      },
+      {
+        "column": "ko_id",
+        "parent": "ORTOLOGIA_KEGG",
+        "target": "ko_id"
+      }
+    ],
+    "specs": {
+      "kegg_gene_id": "VARCHAR(40)",
+      "ko_id": "CHAR(6)"
+    }
+  },
+  {
+    "name": "GENE_PATHWAY",
+    "file": "gene_pathway.tsv",
+    "columns": [
+      "kegg_gene_id",
+      "pathway_id"
+    ],
+    "pk": [
+      "kegg_gene_id",
+      "pathway_id"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "kegg_gene_id",
+        "parent": "GENE_KEGG",
+        "target": "kegg_gene_id"
+      },
+      {
+        "column": "pathway_id",
+        "parent": "PATHWAY_ORGANISMO",
+        "target": "pathway_id"
+      }
+    ],
+    "specs": {
+      "kegg_gene_id": "VARCHAR(40)",
+      "pathway_id": "VARCHAR(12)"
+    }
+  },
+  {
+    "name": "ORTOLOGIA_REAZIONE",
+    "file": "ortologia_reazione.tsv",
+    "columns": [
+      "ko_id",
+      "reaction_id"
+    ],
+    "pk": [
+      "ko_id",
+      "reaction_id"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "ko_id",
+        "parent": "ORTOLOGIA_KEGG",
+        "target": "ko_id"
+      },
+      {
+        "column": "reaction_id",
+        "parent": "REAZIONE_KEGG",
+        "target": "reaction_id"
+      }
+    ],
+    "specs": {
+      "ko_id": "CHAR(6)",
+      "reaction_id": "CHAR(6)"
+    }
+  },
+  {
+    "name": "PATHWAY_REAZIONE",
+    "file": "pathway_reazione.tsv",
+    "columns": [
+      "map_id",
+      "reaction_id"
+    ],
+    "pk": [
+      "map_id",
+      "reaction_id"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "map_id",
+        "parent": "PATHWAY_RIFERIMENTO",
+        "target": "map_id"
+      },
+      {
+        "column": "reaction_id",
+        "parent": "REAZIONE_KEGG",
+        "target": "reaction_id"
+      }
+    ],
+    "specs": {
+      "map_id": "CHAR(8)",
+      "reaction_id": "CHAR(6)"
+    }
+  },
+  {
+    "name": "REAZIONE_COMPOSTO",
+    "file": "reazione_composto.tsv",
+    "columns": [
+      "reaction_id",
+      "compound_id"
+    ],
+    "pk": [
+      "reaction_id",
+      "compound_id"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "reaction_id",
+        "parent": "REAZIONE_KEGG",
+        "target": "reaction_id"
+      },
+      {
+        "column": "compound_id",
+        "parent": "COMPOSTO_KEGG",
+        "target": "compound_id"
+      }
+    ],
+    "specs": {
+      "reaction_id": "CHAR(6)",
+      "compound_id": "CHAR(6)"
+    }
+  },
+  {
+    "name": "PROTEINA_GO",
+    "file": "proteina_go.tsv",
+    "columns": [
+      "accession",
+      "go_id",
+      "evidence_code",
+      "evidence_source"
+    ],
+    "pk": [
+      "accession",
+      "go_id"
+    ],
+    "nullable": [
+      "evidence_code",
+      "evidence_source"
+    ],
+    "fk": [
+      {
+        "column": "accession",
+        "parent": "PROTEIN_UNIPROT",
+        "target": "accession"
+      },
+      {
+        "column": "go_id",
+        "parent": "TERMINE_GO",
+        "target": "go_id"
+      }
+    ],
+    "specs": {
+      "accession": "VARCHAR(10)",
+      "go_id": "CHAR(10)",
+      "evidence_code": "VARCHAR(12)",
+      "evidence_source": "VARCHAR(100)"
+    }
+  },
+  {
+    "name": "PROTEINA_EC",
+    "file": "proteina_ec.tsv",
+    "columns": [
+      "accession",
+      "ec_number"
+    ],
+    "pk": [
+      "accession",
+      "ec_number"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "accession",
+        "parent": "PROTEIN_UNIPROT",
+        "target": "accession"
+      },
+      {
+        "column": "ec_number",
+        "parent": "NUMERO_EC",
+        "target": "ec_number"
+      }
+    ],
+    "specs": {
+      "accession": "VARCHAR(10)",
+      "ec_number": "VARCHAR(20)"
+    }
+  },
+  {
+    "name": "REAZIONE_EC",
+    "file": "reazione_ec.tsv",
+    "columns": [
+      "reaction_id",
+      "ec_number"
+    ],
+    "pk": [
+      "reaction_id",
+      "ec_number"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "reaction_id",
+        "parent": "REAZIONE_KEGG",
+        "target": "reaction_id"
+      },
+      {
+        "column": "ec_number",
+        "parent": "NUMERO_EC",
+        "target": "ec_number"
+      }
+    ],
+    "specs": {
+      "reaction_id": "CHAR(6)",
+      "ec_number": "VARCHAR(20)"
+    }
+  }
+]

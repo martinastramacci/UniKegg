@@ -1,0 +1,53 @@
+name: unikegg
+
+services:
+  mysql:
+    image: mysql:8.0.44
+    command:
+      - --local-infile=1
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-UniKegg}
+      MYSQL_USER: ${MYSQL_USER:-unikegg}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-local-demo-only}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-root-demo-only}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./db/queries:/queries:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -u"$$MYSQL_USER" -D"$$MYSQL_DATABASE" -Nse "SELECT singleton_id FROM ETL_LOAD_STATE LIMIT 1"'
+      interval: 5s
+      timeout: 5s
+      start_period: 40s
+      retries: 60
+    restart: unless-stopped
+
+  etl:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-UniKegg}
+      MYSQL_USER: ${MYSQL_USER:-unikegg}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-local-demo-only}
+      UNIKEGG_PROCESSED_DIR: /data/processed
+      UNIKEGG_DATASET_KIND: ${UNIKEGG_DATASET_KIND:-swissprot}
+    volumes:
+      - ${UNIKEGG_PROCESSED_DIR:-./data/processed}:/data/processed:ro
+      - ./data/raw:/data/raw:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: "no"
+
+volumes:
+  mysql_data:

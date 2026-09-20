@@ -13,7 +13,7 @@ CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
 (ko_id, @name, @definition)
-SET name = NULLIF(@name, ''), definition = NULLIF(@definition, '');
+SET name = IF(OCTET_LENGTH(@name) = 0, NULL, @name), definition = IF(OCTET_LENGTH(@definition) = 0, NULL, @definition);
 
 -- Load PATHWAY_RIFERIMENTO.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/pathway_riferimento.tsv'
@@ -30,7 +30,7 @@ CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
 (reaction_id, @name, @definition, @equation)
-SET name = NULLIF(@name, ''), definition = NULLIF(@definition, ''), equation = NULLIF(@equation, '');
+SET name = IF(OCTET_LENGTH(@name) = 0, NULL, @name), definition = IF(OCTET_LENGTH(@definition) = 0, NULL, @definition), equation = IF(OCTET_LENGTH(@equation) = 0, NULL, @equation);
 
 -- Load COMPOSTO_KEGG.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/composto_kegg.tsv'
@@ -39,7 +39,7 @@ CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
 (compound_id, name, @formula, @exact_mass, @molecular_weight)
-SET formula = NULLIF(@formula, ''), exact_mass = NULLIF(@exact_mass, ''), molecular_weight = NULLIF(@molecular_weight, '');
+SET formula = IF(OCTET_LENGTH(@formula) = 0, NULL, @formula), exact_mass = IF(OCTET_LENGTH(@exact_mass) = 0, NULL, @exact_mass), molecular_weight = IF(OCTET_LENGTH(@molecular_weight) = 0, NULL, @molecular_weight);
 
 -- Load TERMINE_GO.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/termine_go.tsv'
@@ -64,7 +64,7 @@ CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
 (kegg_gene_id, organism_id, gene_type, @symbol, @definition)
-SET symbol = NULLIF(@symbol, ''), definition = NULLIF(@definition, '');
+SET symbol = IF(OCTET_LENGTH(@symbol) = 0, NULL, @symbol), definition = IF(OCTET_LENGTH(@definition) = 0, NULL, @definition);
 
 -- Load PROTEIN_UNIPROT.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/protein_uniprot.tsv'
@@ -73,7 +73,7 @@ CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
 (accession, organism_id, entry_name, @protein_name, sequence_length, molecular_mass, protein_existence, sequence_version, amino_acid_sequence)
-SET protein_name = NULLIF(@protein_name, '');
+SET protein_name = IF(OCTET_LENGTH(@protein_name) = 0, NULL, @protein_name);
 
 -- Load PATHWAY_ORGANISMO.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/pathway_organismo.tsv'
@@ -90,7 +90,7 @@ CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
 (isoform_id, accession, ordinal, name, sequence_status, @note)
-SET note = NULLIF(@note, '');
+SET note = IF(OCTET_LENGTH(@note) = 0, NULL, @note);
 
 -- Load GENE_PROTEINA.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/gene_proteina.tsv'
@@ -147,7 +147,7 @@ CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
 (accession, go_id, @evidence_code, @evidence_source)
-SET evidence_code = NULLIF(@evidence_code, ''), evidence_source = NULLIF(@evidence_source, '');
+SET evidence_code = IF(OCTET_LENGTH(@evidence_code) = 0, NULL, @evidence_code), evidence_source = IF(OCTET_LENGTH(@evidence_source) = 0, NULL, @evidence_source);
 
 -- Load PROTEINA_EC.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/proteina_ec.tsv'

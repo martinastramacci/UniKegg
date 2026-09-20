@@ -10,3 +10,5 @@ docs
 .env*
 *.sql.gz
 *.zip
+.unikegg-*
+**/.unikegg-*

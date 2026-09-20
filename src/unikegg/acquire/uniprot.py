@@ -159,19 +159,39 @@ def scarica(url: str, destinazione: Path, dry_run: bool) -> None:
             time.sleep(2**tentativo)
 
 
+def planned_requests():
+    """One naming policy for both entry points, including existing legacy exports."""
+    tasks = []
+    for taxid, codice in ORGANISMI:
+        query = f"(organism_id:{taxid}) AND (reviewed:true)"
+        current = RAW / f"{taxid}_{codice}.tsv.gz"
+        legacy = RAW / f"{taxid}_{codice}.index.tsv.gz"
+        if current.exists() and legacy.exists():
+            raise ValueError(
+                f"Duplicate UniProt exports: {current.name} and {legacy.name}. "
+                "Select a single coherent snapshot in a separate raw directory."
+            )
+        destination = legacy if legacy.exists() else current
+        tasks.append((crea_url(query, "json"), RAW / f"{taxid}_{codice}.json.gz"))
+        tasks.append((crea_url(query, "tsv", CAMPI), destination))
+    return tasks
+
+
+def run(dry_run=False):
+    # Build the whole plan first: name conflicts must fail before any download.
+    for url, destination in planned_requests():
+        scarica(url, destination, dry_run)
+    print("OK: raw UniProt pianificati/completati. Nessuna trasformazione ETL eseguita.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="mostra URL senza scaricare")
-    args = parser.parse_args()
-    for taxid, codice in ORGANISMI:
-        query = f"(organism_id:{taxid}) AND (reviewed:true)"
-        scarica(crea_url(query, "json"), RAW / f"{taxid}_{codice}.json.gz", args.dry_run)
-        scarica(crea_url(query, "tsv", CAMPI), RAW / f"{taxid}_{codice}.index.tsv.gz", args.dry_run)
-    print("OK: raw UniProt pianificati/completati. Nessuna trasformazione ETL eseguita.")
+    run(dry_run=parser.parse_args().dry_run)
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (RuntimeError, OSError) as errore:
+    except (RuntimeError, OSError, ValueError) as errore:
         raise SystemExit(f"ERRORE: {errore}")

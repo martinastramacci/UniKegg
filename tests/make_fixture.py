@@ -4,10 +4,11 @@ import argparse
 import csv
 from pathlib import Path
 
+from unikegg import tsv
 from unikegg.dataset import CODES, TABLES, manifest
 
 
-def generate(directory):
+def generate(directory, edge_cases=False, legacy_quoting=False):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     data = {t["name"]: [] for t in TABLES}
@@ -38,9 +39,32 @@ def generate(directory):
     data["PATHWAY_REAZIONE"] = [["map00010", "R00001"]]
     data["REAZIONE_COMPOSTO"] = [["R00001", "C00001"]]
     data["REAZIONE_EC"] = [["R00001", "1.1.1.1"]]
+    if edge_cases:
+        data["COMPOSTO_KEGG"][0][1] = "NULL"
+        data["COMPOSTO_KEGG"][0][3] = "99999999999999.9999999999"
+        data["GENE_KEGG"][0][3] = "NULL"
+        data["GENE_KEGG"][1][3] = ""
+        data["PROTEIN_UNIPROT"][0][3] = 'Line one\nLine two\t"quoted" \\path café 🧬'
+        data["PROTEIN_UNIPROT"][0][4:6] = [200000, 20000000]
+        data["PROTEIN_UNIPROT"][0][8] = "A" * 200000
+        data["PROTEIN_UNIPROT"][1][3] = r"\N"
+        data["PROTEIN_UNIPROT"][2][3] = ""
+        data["PROTEIN_UNIPROT"][3][3] = " "
+        data["PROTEIN_UNIPROT"][4][3] = "\u0301"
+        data["TERMINE_GO"][0][1] = "λ" * 500
+        data["NUMERO_EC"].append(["3.5.1.n3"])
+        human = next(
+            p[0] for p in data["PROTEIN_UNIPROT"] if p[1] == sorted(CODES).index("hsa") + 1
+        )
+        data["PROTEINA_EC"].append([human, "3.5.1.n3"])
+        data["REAZIONE_EC"].append(["R00001", "3.5.1.n3"])
     for table in TABLES:
         with (directory / table["file"]).open("w", encoding="utf-8", newline="") as stream:
-            writer = csv.writer(stream, delimiter="\t", lineterminator="\n")
+            writer = (
+                csv.writer(stream, delimiter="\t", lineterminator="\n")
+                if legacy_quoting
+                else tsv.writer(stream)
+            )
             writer.writerow(table["columns"])
             writer.writerows(data[table["name"]])
     manifest(directory, "synthetic")
@@ -50,4 +74,7 @@ def generate(directory):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=Path("tests/fixtures/processed"))
-    generate(parser.parse_args().output)
+    parser.add_argument("--edge-cases", action="store_true")
+    parser.add_argument("--legacy-quoting", action="store_true")
+    args = parser.parse_args()
+    generate(args.output, args.edge_cases, args.legacy_quoting)

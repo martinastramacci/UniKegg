@@ -20,6 +20,9 @@ artifacts/**
 dump*.sql
 *.zip
 
+# Private ETL staging, recovery backups and writer locks
+.unikegg-*
+
 # Runtime/build output
 .venv/
 tests/fixtures/processed/

@@ -6,7 +6,7 @@ UniKegg integrates KEGG genes, orthology groups, pathways, reactions and compoun
 
 Swiss-Prot is the protein reference set because its manually reviewed annotations provide a curated basis for protein identity, sequence metadata and functional interpretation. Acquisition explicitly requests `reviewed:true`; transformation rejects records whose `Reviewed` field is not `reviewed`. KEGG-to-protein mappings are retained only when both endpoints exist in the selected dataset. Manual review improves semantic reliability; it does **not** itself guarantee referential integrity. Primary keys, foreign keys, domain constraints and cross-organism validation enforce the relational contract.
 
-The prepared local snapshot contains 10 organisms, 20 domain tables, 2,006,370 rows, 89,601 reviewed protein records and 200,249 KEGG genes. These figures describe this snapshot, not a guarantee about future upstream releases. Acquisition is optional and is never started by the demo.
+The prepared local snapshot contains 10 organisms, 20 domain tables, 2,006,370 rows, 89,601 reviewed protein records and 200,249 KEGG genes. These figures describe this snapshot, not a guarantee about future upstream releases. Acquisition is optional and is never started by the demo. Regeneration with updated parsers can change bytes, counts and fingerprints; the historical snapshot counts are not an acceptance target for new exports.
 
 ## System Architecture & Database Schema
 
@@ -14,7 +14,7 @@ The prepared local snapshot contains 10 organisms, 20 domain tables, 2,006,370 r
 UniKegg/
 ├── src/unikegg/
 │   ├── acquire/              # Explicit KEGG and reviewed UniProt acquisition
-│   ├── transforms/           # Existing entity and relationship parsers
+│   ├── transforms/           # Strict parsers and staged publication
 │   ├── dataset.py            # Hashes, provenance and relational validation
 │   ├── loader.py             # Transactional MySQL bulk ingestion
 │   └── schema.json           # Machine-readable 20-table contract
@@ -53,11 +53,11 @@ The schema separates biological entities from many-to-many associations. `GENE_P
 
 An additional infrastructure table, `ETL_LOAD_STATE`, records the committed dataset fingerprint. It is not a biological domain table. Foreign-key checks remain enabled. The loader rejects MySQL warnings and rolls back uncommitted data on failure. A repeat load of the same manifest verifies the existing database; a different manifest or an unexplained nonempty database is rejected instead of overwritten.
 
-TSVs use UTF-8, tab separators, LF line endings, optional double-quote enclosure and doubled internal quotes. Empty values become SQL `NULL` only in nullable fields. The ingestion SQL explicitly matches this format; it does not treat backslashes as escape characters. Canonical sequences use `MEDIUMTEXT` and must match their declared lengths.
+TSVs use UTF-8, tab separators, LF line endings and doubled internal quotes. New exports quote every field. Legacy bundles with optional enclosure remain supported: the loader validates a private snapshot and rewrites that transport copy with full enclosure before SQL, preserving the literal string `NULL`. Empty values become SQL `NULL` only in nullable fields; backslashes are not escape characters. Canonical sequences use `MEDIUMTEXT` and must match their declared lengths. Validation also checks secondary unique keys, integer and decimal ranges, text byte limits and the configured SQL domains. Biological keys and references must be printable, non-space ASCII; free-text annotations remain UTF-8.
 
 ## Infrastructure Setup (Docker Compose)
 
-Install Docker Engine or Docker Desktop with the Compose v2 plugin. Use Linux containers. Run commands from this directory. Container images and Python dependencies require network access on the first build; biological data downloads are not required for the prepared demo. Allow approximately 4 GB of available memory and several GB of free disk space for images, the database and temporary build files; actual use depends on the runtime.
+Install Docker Engine or Docker Desktop with the Compose v2 plugin. Use Linux containers. Run commands from this directory. Container images and Python dependencies require network access on the first build; biological data downloads are not required for the prepared demo. Allow approximately 4 GB of available memory and several GB of free disk space for images, the database and temporary build files; actual use depends on the runtime. Loading now requires temporary storage for a private TSV snapshot plus the largest table being re-encoded (including quote overhead). Compose mounts `/tmp` as tmpfs, which consumes RAM; provide an appropriately sized writable `TMPDIR` mount for larger bundles.
 
 The two services are:
 
@@ -87,9 +87,9 @@ python tools/lint_ingest.py
 pytest -q
 ```
 
-For runtime-only use, install `requirements.txt` instead. The local CLI reads environment variables, not `.env` files. Explicit download commands are `unikegg download-uniprot` and `unikegg download-kegg`; append `--dry-run` to inspect requests without contacting the upstream APIs. Run `unikegg transform` only after authorized raw exports are available under `data/raw/`. See [operations](docs/operations.md) for source layout, manifest generation and failure handling.
+For runtime-only use, install `requirements.txt` instead. The local CLI reads environment variables, not `.env` files. Explicit download commands are `unikegg download-uniprot` and `unikegg download-kegg`; append `--dry-run` to inspect requests without contacting the upstream APIs. Other commands reject this flag before doing any work. Run `unikegg transform` only after authorized raw exports are available under `data/raw/`. See [operations](docs/operations.md) for source layout, manifest generation and failure handling.
 
-GitHub Actions runs Ruff, SQLFluff with the MySQL dialect and unit tests, then starts both Compose services on an ephemeral runner. Integration uses invented fixtures covering all 20 domain tables and 10 organism codes. It tests automatic initialization, successful loading, verification and a repeated load. It does not download or publish upstream datasets.
+GitHub Actions runs Ruff, SQLFluff with the MySQL dialect and unit tests, then starts both Compose services on an ephemeral runner. Integration uses invented fixtures covering all 20 domain tables and 10 organism codes. It tests automatic initialization, successful loading, verification and a repeated load. A separate, initially empty regression database tests warning-triggered rollback, concurrent loaders, all-field TSV/SQL round trips (including legacy literal `NULL` and long sequences), and all 30 integration queries. Unit tests cover raw transformation and fail-closed acquisition using invented data and mocked HTTP. CI tests Python 3.11/3.12 and audits Python dependencies. It does not download or publish upstream datasets.
 
 ## Quickstart / Demo Environment
 

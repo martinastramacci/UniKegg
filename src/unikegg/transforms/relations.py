@@ -1,14 +1,16 @@
 """Source-preserving UniKegg acquisition and transformation routines."""
 
-import csv
 import re
 from collections import Counter
 from pathlib import Path
 
+from unikegg import tsv
 from unikegg.acquire.reviewed import reviewed_rows
 from unikegg.config import ARTIFACTS, RAW
 from unikegg.config import PROCESSED as OUTPUT
-from unikegg.config import PROJECT as BASE
+from unikegg.identifiers import EC_RE
+from unikegg.kegg_data import detail_records as leggi_record_flat_file
+from unikegg.kegg_data import tabular_rows
 
 RAW_KEGG = RAW / "kegg"
 CONTROLLI = ARTIFACTS
@@ -17,7 +19,6 @@ ORGANISMI = ["hsa", "mmu", "rno", "dre", "dme", "cel", "ath", "sce", "eco", "bsu
 # Il gene nella colonna KEGG di UniProt non e' sempre numerico: in Arabidopsis
 # e' per esempio ath:AT1G01010. Una regex con soli \d+ perderebbe quei mapping.
 GENE_KEGG_RE = re.compile(r"([a-z][a-z0-9]{2,4}:[^;\s]+)")
-EC_RE = re.compile(r"\d+\.[\d-]+\.[\d-]+\.[\d-]+")
 
 
 def senza_prefisso(valore: str) -> str:
@@ -25,13 +26,12 @@ def senza_prefisso(valore: str) -> str:
 
 
 def leggi_tsv(percorso: Path):
-    with percorso.open(encoding="utf-8", newline="") as file:
-        yield from csv.reader(file, delimiter="\t")
+    yield from tabular_rows(percorso)
 
 
 def leggi_output(nome_file: str) -> list[dict[str, str]]:
     with (OUTPUT / nome_file).open(encoding="utf-8", newline="") as file:
-        return list(csv.DictReader(file, delimiter="\t"))
+        return list(tsv.dict_reader(file))
 
 
 def set_colonna(nome_file: str, colonna: str) -> set[str]:
@@ -42,7 +42,7 @@ def scrivi_tsv(nome_file: str, intestazione: list[str], righe) -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     righe_uniche = sorted(set(tuple(riga) for riga in righe))
     with (OUTPUT / nome_file).open("w", encoding="utf-8", newline="") as file:
-        scrittore = csv.writer(file, delimiter="\t", lineterminator="\n")
+        scrittore = tsv.writer(file)
         scrittore.writerow(intestazione)
         scrittore.writerows(righe_uniche)
     print(f"[03_produci_relazioni] OK: {nome_file} ({len(righe_uniche)} righe)")
@@ -50,28 +50,6 @@ def scrivi_tsv(nome_file: str, intestazione: list[str], righe) -> None:
 
 def leggi_uniprot_tsv():
     yield from reviewed_rows()
-
-
-def leggi_record_flat_file(cartella: Path):
-    """Come in 02_produci_entita: record KEGG testuali terminati da ///."""
-    for percorso in sorted(cartella.glob("*.txt")):
-        record = {}
-        campo = None
-        with percorso.open(encoding="utf-8") as file:
-            for riga in file:
-                if riga.startswith("///"):
-                    if record:
-                        yield record
-                    record = {}
-                    campo = None
-                    continue
-                nome = riga[:12].strip()
-                valore = riga[12:].rstrip()
-                if nome:
-                    campo = nome
-                    record.setdefault(campo, []).append(valore)
-                elif campo:
-                    record[campo].append(valore)
 
 
 def costruisci_gene_proteina():
@@ -126,7 +104,7 @@ def scrivi_report_gene_proteina(conteggi: dict[str, Counter]) -> None:
     ]
     tot = Counter()
     with percorso.open("w", encoding="utf-8", newline="") as file:
-        scrittore = csv.writer(file, delimiter="\t", lineterminator="\n")
+        scrittore = tsv.writer(file)
         scrittore.writerow(colonne)
         for codice in ORGANISMI:
             c = conteggi[codice]
@@ -144,7 +122,7 @@ def scrivi_report_gene_proteina(conteggi: dict[str, Counter]) -> None:
                 ]
             )
             tot.update(c)
-    print(f"[03_produci_relazioni] Report scarti: {percorso.relative_to(BASE)}")
+    print(f"[03_produci_relazioni] Report scarti: {percorso.resolve()}")
     print(
         f"  KEGG_CONV: {tot['conv_letti']} letti, {tot['conv_accettati']} accettati, "
         f"{tot['conv_non_reviewed']} scartati perche' l'accession non e' reviewed, "
@@ -210,7 +188,7 @@ def costruisci_reazione_ec():
     reazioni = set_colonna("reazione_kegg.tsv", "reaction_id")
     ec_validi = set_colonna("numero_ec.tsv", "ec_number")
     righe = []
-    for record in leggi_record_flat_file(RAW_KEGG / "details" / "reaction"):
+    for record in leggi_record_flat_file(RAW_KEGG / "details" / "reaction", expected=reazioni):
         entry = record.get("ENTRY", [""])[0].split()
         if not entry or entry[0] not in reazioni:
             continue

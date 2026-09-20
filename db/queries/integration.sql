@@ -27,7 +27,7 @@ JOIN REAZIONE_KEGG r ON r.reaction_id = re.reaction_id
 JOIN PATHWAY_REAZIONE pr ON pr.reaction_id = r.reaction_id AND pr.map_id = po.map_id
 WHERE
     o.kegg_code = 'hsa' AND po.map_id = 'map00010'
-    AND pe.ec_number NOT LIKE '%-%'
+    AND REGEXP_LIKE(pe.ec_number, '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
 ORDER BY p.accession, r.reaction_id, pe.ec_number;
 
 
@@ -58,7 +58,7 @@ WHERE
     pr.map_id = 'map00010'
     AND EXISTS (
         SELECT 1 FROM REAZIONE_EC re
-        WHERE re.reaction_id = r.reaction_id AND re.ec_number NOT LIKE '%-%'
+        WHERE re.reaction_id = r.reaction_id AND REGEXP_LIKE(re.ec_number, '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
     )
     AND NOT EXISTS (
         SELECT 1 FROM REAZIONE_EC re
@@ -66,7 +66,7 @@ WHERE
         JOIN PROTEIN_UNIPROT p ON p.accession = pe.accession
         JOIN ORGANISMO o ON o.organism_id = p.organism_id
         WHERE
-            re.reaction_id = r.reaction_id AND re.ec_number NOT LIKE '%-%'
+            re.reaction_id = r.reaction_id AND REGEXP_LIKE(re.ec_number, '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
             AND o.kegg_code = 'hsa'
     )
 ORDER BY r.reaction_id;
@@ -283,7 +283,7 @@ ORDER BY e.ec_number LIMIT 100;
 SELECT p.accession, p.protein_name, COUNT(DISTINCT pe.ec_number) AS attivita_ec
 FROM PROTEIN_UNIPROT p JOIN PROTEINA_EC pe ON pe.accession = p.accession
 WHERE
-    pe.ec_number NOT LIKE '%-%'
+    REGEXP_LIKE(pe.ec_number, '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
     AND EXISTS (SELECT 1 FROM REAZIONE_EC re WHERE re.ec_number = pe.ec_number)
 GROUP BY p.accession, p.protein_name HAVING COUNT(DISTINCT pe.ec_number) >= 2
 ORDER BY attivita_ec DESC, p.accession LIMIT 100;
@@ -294,7 +294,7 @@ SELECT
     r.reaction_id, r.name, COUNT(DISTINCT p.organism_id) AS organismi,
     COUNT(DISTINCT p.accession) AS proteine_candidate
 FROM REAZIONE_KEGG r
-LEFT JOIN REAZIONE_EC re ON re.reaction_id = r.reaction_id AND re.ec_number NOT LIKE '%-%'
+LEFT JOIN REAZIONE_EC re ON re.reaction_id = r.reaction_id AND REGEXP_LIKE(re.ec_number, '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
 LEFT JOIN PROTEINA_EC pe ON pe.ec_number = re.ec_number
 LEFT JOIN PROTEIN_UNIPROT p ON p.accession = pe.accession
 GROUP BY r.reaction_id, r.name ORDER BY organismi DESC, r.reaction_id LIMIT 100;
@@ -307,7 +307,7 @@ JOIN PROTEINA_EC pe ON pe.accession = p.accession
 JOIN REAZIONE_EC re ON re.ec_number = pe.ec_number
 JOIN REAZIONE_KEGG r ON r.reaction_id = re.reaction_id
 JOIN REAZIONE_COMPOSTO rc ON rc.reaction_id = r.reaction_id
-WHERE o.kegg_code = 'hsa' AND rc.compound_id = 'C00002' AND pe.ec_number NOT LIKE '%-%'
+WHERE o.kegg_code = 'hsa' AND rc.compound_id = 'C00002' AND REGEXP_LIKE(pe.ec_number, '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
 ORDER BY p.accession, r.reaction_id, pe.ec_number LIMIT 100;
 
 
@@ -315,7 +315,7 @@ SELECT c.compound_id, c.name, COUNT(DISTINCT pe.accession) AS proteine_candidate
 FROM COMPOSTO_KEGG c JOIN REAZIONE_COMPOSTO rc ON rc.compound_id = c.compound_id
 JOIN REAZIONE_EC re ON re.reaction_id = rc.reaction_id
 JOIN PROTEINA_EC pe ON pe.ec_number = re.ec_number
-WHERE re.ec_number NOT LIKE '%-%'
+WHERE REGEXP_LIKE(re.ec_number, '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
 GROUP BY c.compound_id, c.name ORDER BY proteine_candidate DESC, c.compound_id LIMIT 20;
 
 
@@ -360,5 +360,5 @@ JOIN ORTOLOGIA_REAZIONE kr ON kr.ko_id = k.ko_id
 JOIN REAZIONE_KEGG r ON r.reaction_id = kr.reaction_id
 JOIN REAZIONE_EC re ON re.reaction_id = r.reaction_id
 JOIN PROTEINA_EC pe ON pe.accession = p.accession AND pe.ec_number = re.ec_number
-WHERE o.kegg_code = 'hsa' AND pe.ec_number NOT LIKE '%-%'
+WHERE o.kegg_code = 'hsa' AND REGEXP_LIKE(pe.ec_number, '^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$')
 ORDER BY p.accession, r.reaction_id, k.ko_id, pe.ec_number LIMIT 100;

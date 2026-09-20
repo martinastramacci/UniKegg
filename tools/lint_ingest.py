@@ -15,11 +15,13 @@ def projections(sql):
         if len(parts) == 1:
             yield parts[0] + ";\n"
         else:
-            # The executable template uses plain column = NULLIF(@variable, '') pairs.
+            # The executable template uses byte-length based empty-to-NULL assignments.
             assignments = re.split(r",\s*(?=[a-z_]+\s*=)", parts[1], flags=re.IGNORECASE)
             for assignment in assignments:
                 if not re.fullmatch(
-                    r"[a-z_]+\s*=\s*NULLIF\(@[a-z_]+,\s*''\)", assignment.strip(), re.IGNORECASE
+                    r"[a-z_]+\s*=\s*IF\(OCTET_LENGTH\(@([a-z_]+)\)\s*=\s*0,\s*NULL,\s*@\1\)",
+                    assignment.strip(),
+                    re.IGNORECASE,
                 ):
                     raise ValueError(
                         f"Unsupported assignment; extend the lint projection: {assignment}"

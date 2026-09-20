@@ -30,3 +30,26 @@ def test_workflow_uses_container_integration():
     assert "docker compose up --build -d" in commands
     assert "docker compose run --rm etl verify" in commands
     assert "docker compose down --volumes" in commands
+
+
+def test_extended_ci_uses_isolated_mysql_and_dependency_audit():
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"), Loader=yaml.BaseLoader
+    )
+    unit = workflow["jobs"]["lint-and-unit"]
+    assert set(unit["strategy"]["matrix"]["python"]) == {"3.11", "3.12"}
+    assert any("pip-audit -r requirements-dev.txt" in s.get("run", "") for s in unit["steps"])
+    integration = workflow["jobs"]["mysql-integration"]
+    commands = "\n".join(s.get("run", "") for s in integration["steps"])
+    assert "CREATE DATABASE UniKeggRegression" in commands
+    assert "python -m tests.mysql_integration" in commands
+
+
+def test_mysql_regression_runner_requires_explicit_opt_in(monkeypatch):
+    import pytest
+
+    from tests import mysql_integration
+
+    monkeypatch.delenv("UNIKEGG_MYSQL_TEST_DATABASE", raising=False)
+    with pytest.raises(RuntimeError, match="opt-in"):
+        mysql_integration.run()

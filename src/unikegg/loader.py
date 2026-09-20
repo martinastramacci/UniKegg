@@ -9,10 +9,10 @@ from contextlib import suppress
 import mysql.connector
 
 from unikegg.config import PROCESSED, PROJECT
-from unikegg.dataset import TABLES, validate
+from unikegg.dataset import TABLES, quote_for_mysql, verified_snapshot
 
 
-def connect():
+def connect(directory=None):
     return mysql.connector.connect(
         host=os.environ.get("MYSQL_HOST", "localhost"),
         port=int(os.environ.get("MYSQL_PORT", "3307")),
@@ -23,7 +23,7 @@ def connect():
         autocommit=False,
         use_pure=True,
         allow_local_infile=False,
-        allow_local_infile_in_path=str(PROCESSED),
+        allow_local_infile_in_path=str(directory or PROCESSED),
         raise_on_warnings=True,
         connection_timeout=10,
         sql_mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION",
@@ -77,11 +77,16 @@ def verify(connection, manifest):
 
 def run(verify_only=False):
     kind = os.environ.get("UNIKEGG_DATASET_KIND", "swissprot")
-    manifest, fingerprint = validate(PROCESSED, kind)
-    connection = connect()
-    cursor = connection.cursor()
+    with verified_snapshot(PROCESSED, kind) as (directory, manifest, fingerprint):
+        return _run(directory, manifest, fingerprint, kind, verify_only)
+
+
+def _run(directory, manifest, fingerprint, kind, verify_only):
+    connection = connect(directory)
+    cursor = None
     locked = False
     try:
+        cursor = connection.cursor()
         cursor.execute("SELECT GET_LOCK('unikegg_ingestion', 60)")
         locked = cursor.fetchone()[0] == 1
         if not locked:
@@ -98,13 +103,14 @@ def run(verify_only=False):
                 json.dumps({"event": "ready", "dataset_sha256": fingerprint, "action": "verified"}),
                 flush=True,
             )
-            return
+            return {"action": "verified", "dataset_sha256": fingerprint}
         for table in TABLES:
             cursor.execute(f"SELECT EXISTS(SELECT 1 FROM `{table['name']}`)")
             if cursor.fetchone()[0]:
                 raise ValueError("Nonempty database without load state; refusing to overwrite")
         sql = (PROJECT / "db/load/001_ingest.sql").read_text(encoding="utf-8")
-        statements = load_statements(sql, PROCESSED)
+        quote_for_mysql(directory)
+        statements = load_statements(sql, directory)
         for statement in statements:
             if statement.strip():
                 start = time.monotonic()
@@ -113,6 +119,7 @@ def run(verify_only=False):
                     json.dumps(
                         {
                             "event": "table_loaded",
+                            "table": re.search(r"INTO TABLE (\w+)", statement)[1],
                             "rows": cursor.rowcount,
                             "seconds": round(time.monotonic() - start, 3),
                         }
@@ -129,6 +136,7 @@ def run(verify_only=False):
             json.dumps({"event": "ready", "dataset_sha256": fingerprint, "action": "loaded"}),
             flush=True,
         )
+        return {"action": "loaded", "dataset_sha256": fingerprint}
     except Exception:
         with suppress(mysql.connector.Error):
             connection.rollback()
@@ -138,6 +146,7 @@ def run(verify_only=False):
             with suppress(mysql.connector.Error):
                 cursor.execute("SELECT RELEASE_LOCK('unikegg_ingestion')")
                 cursor.fetchone()
-        with suppress(mysql.connector.Error):
-            cursor.close()
+        if cursor is not None:
+            with suppress(mysql.connector.Error):
+                cursor.close()
         connection.close()

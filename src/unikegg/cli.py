@@ -4,7 +4,7 @@ import argparse
 import os
 from pathlib import Path
 
-from unikegg.config import ARTIFACTS, PROCESSED
+from unikegg.config import PROCESSED
 
 
 def main():
@@ -21,9 +21,19 @@ def main():
             "download-kegg",
         ],
     )
-    parser.add_argument("--reviewed-export", type=Path)
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--reviewed-export", type=Path, help="reviewed source directory (transform/manifest only)"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="plan requests without downloads (download commands only)",
+    )
     args = parser.parse_args()
+    if args.dry_run and args.command not in {"download-uniprot", "download-kegg"}:
+        parser.error("--dry-run is supported only by download-uniprot and download-kegg")
+    if args.reviewed_export and args.command not in {"transform", "manifest"}:
+        parser.error("--reviewed-export is supported only by transform and manifest")
     if args.reviewed_export:
         os.environ["UNIKEGG_REVIEWED_DIR"] = str(args.reviewed_export.resolve())
     if args.command in {"load", "verify"}:
@@ -39,21 +49,17 @@ def main():
         from unikegg.dataset import manifest, validate
 
         if args.command == "transform":
-            from unikegg.transforms import entities, relations
+            from unikegg.transforms.pipeline import run
 
-            ARTIFACTS.mkdir(parents=True, exist_ok=True)
-            entities.main()
-            relations.main()
-        reviewed = {row["Entry"] for row in reviewed_rows(args.reviewed_export)}
-        manifest(PROCESSED, "swissprot", reviewed)
-        validate(PROCESSED)
+            run(PROCESSED, args.reviewed_export)
+        else:
+            reviewed = {row["Entry"] for row in reviewed_rows(args.reviewed_export)}
+            manifest(PROCESSED, "swissprot", reviewed)
+            validate(PROCESSED)
     elif args.command == "download-uniprot":
-        from unikegg.acquire.uniprot import CAMPI, ORGANISMI, RAW, crea_url, scarica
+        from unikegg.acquire.uniprot import run
 
-        for taxid, code in ORGANISMI:
-            query = f"(organism_id:{taxid}) AND (reviewed:true)"
-            scarica(crea_url(query, "json"), RAW / f"{taxid}_{code}.json.gz", args.dry_run)
-            scarica(crea_url(query, "tsv", CAMPI), RAW / f"{taxid}_{code}.tsv.gz", args.dry_run)
+        run(dry_run=args.dry_run)
     else:
         from unikegg.acquire.kegg import run
 

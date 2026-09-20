@@ -162,7 +162,7 @@ Twenty domain tables are shown. `ETL_LOAD_STATE` is operational metadata and is 
 
 All foreign-key endpoints and column types are shown above. A parent can have zero or many child records; every stored child reference targets one parent. Composite primary keys make bridge relationships unique at their declared grain.
 
-Additional unique keys are `ORGANISMO.kegg_code`, `ORGANISMO.taxonomy_id`, `PROTEIN_UNIPROT.entry_name`, `PATHWAY_ORGANISMO(organism_id, map_id)` and `PROTEIN_ISOFORM(accession, ordinal)`. Nullable attributes represent unavailable annotations, not fabricated values. The DDL in `db/init/001_schema.sql` is the executable authority for types, checks, delete behavior and indexes.
+Additional unique keys are `ORGANISMO.kegg_code`, `ORGANISMO.taxonomy_id`, `PROTEIN_UNIPROT.entry_name`, `PATHWAY_ORGANISMO(organism_id, map_id)` and `PROTEIN_ISOFORM(accession, ordinal)`. For newly transformed isoforms, `ordinal` is the numeric IsoId suffix within the stored parent accession, not the block position in an External citation. Metadata from the parent entry wins over external citations; ties are resolved deterministically. Nullable attributes represent unavailable annotations, not fabricated values. The DDL in `db/init/001_schema.sql` is the executable authority for types, checks, delete behavior and indexes.
 
 The principal integration traversal is `ORGANISMO → GENE_KEGG → GENE_PROTEINA → PROTEIN_UNIPROT`. The same gene links to KEGG orthology and pathway dimensions, while the protein links to GO and EC dimensions. Reaction-level integration can traverse orthology/reaction mappings or EC assignments; these paths encode different source assertions and should not be treated as interchangeable evidence.
 

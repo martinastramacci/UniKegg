@@ -16,8 +16,8 @@ jobs:
       matrix:
         python: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -43,8 +43,8 @@ jobs:
       MYSQL_PASSWORD: ci-ephemeral-only
       MYSQL_ROOT_PASSWORD: ci-root-ephemeral-only
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Generate independent synthetic data
@@ -71,6 +71,16 @@ jobs:
         run: |
           pip install -r requirements.txt
           PYTHONPATH=src python -m tests.mysql_integration
+      - name: Surface failed ETL diagnostics in Checks
+        if: failure()
+        run: |
+          docker compose logs --no-color etl > /tmp/unikegg-etl.log 2>&1
+          python - <<'PYTHON'
+          from pathlib import Path
+          message = "\n".join(Path("/tmp/unikegg-etl.log").read_text().splitlines()[-60:])
+          message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          print(f"::error title=ETL diagnostics::{message}")
+          PYTHON
       - name: Container logs
         if: always()
         run: docker compose logs --no-color

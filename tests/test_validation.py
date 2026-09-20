@@ -230,3 +230,21 @@ def test_column_contract_matches_ddl():
             for key in re.findall(r"UNIQUE \(([^)]+)\)", block)
         )
         assert unique == {tuple(key) for key in table.get("unique", [])}
+
+
+@pytest.mark.skipif(__import__("os").name != "posix", reason="POSIX umask semantics")
+def test_manifest_atomic_write_honors_bundle_permissions(tmp_path):
+    import os
+    import stat
+
+    old_umask = os.umask(0o022)
+    try:
+        generate(tmp_path)
+        path = tmp_path / "manifest.json"
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644
+        path.chmod(0o640)
+        manifest(tmp_path, "synthetic")
+        assert stat.S_IMODE(path.stat().st_mode) == 0o640
+        assert not list(tmp_path.glob(".unikegg-manifest-*.tmp"))
+    finally:
+        os.umask(old_umask)

@@ -36,6 +36,7 @@ def query(sql, params=None):
     try:
         cursor = connection.cursor()
         try:
+            cursor.execute("SET time_zone = '+00:00'")
             cursor.execute(sql, params)
             return cursor.fetchall()
         finally:
@@ -169,6 +170,46 @@ def run():
             flush=True,
         )
 
+        # Keep row counts and foreign keys unchanged: only exact comparison can
+        # detect these edits, including case changes and equal-length sequences.
+        metadata_before = query("SELECT * FROM ETL_LOAD_STATE")
+        history_before = query("SELECT * FROM ETL_DATASET_HISTORY")
+        for name, column, changed in [
+            ("GENE_KEGG", "definition", lambda value: value.swapcase()),
+            ("PROTEIN_UNIPROT", "amino_acid_sequence", lambda value: "X" + value[1:]),
+            ("GENE_KEGG", "symbol", lambda value: None if value is not None else ""),
+        ]:
+            table = BY_NAME[name]
+            row = expected[name][0]
+            key = row[table["columns"].index(table["pk"][0])]
+            original_value = row[table["columns"].index(column)]
+            new_value = changed(original_value)
+            assert new_value != original_value
+            connection = loader.connect()
+            cursor = connection.cursor()
+            statement = f"UPDATE `{name}` SET `{column}`=%s WHERE `{table['pk'][0]}`=%s"
+            try:
+                cursor.execute(statement, (new_value, key))
+                connection.commit()
+                for verify_only in (True, False):
+                    error = expect_error(lambda: loader.run(verify_only=verify_only), ValueError)
+                    assert "differ from staged dataset" in str(error)
+                assert query("SELECT * FROM ETL_LOAD_STATE") == metadata_before
+                assert query("SELECT * FROM ETL_DATASET_HISTORY") == history_before
+                assert query(
+                    f"SELECT `{column}` FROM `{name}` WHERE `{table['pk'][0]}`=%s", (key,)
+                ) == [(new_value,)]
+            finally:
+                cursor.execute(statement, (original_value, key))
+                connection.commit()
+                cursor.close()
+                connection.close()
+        assert loader.run(verify_only=True)["action"] == "verified"
+        assert original == {p.name: p.read_bytes() for p in directory.iterdir()}
+        print(
+            "Verify/repeated load reject field drift without changing data or history.", flush=True
+        )
+
         connection = loader.connect()
         try:
             cursor = connection.cursor()
@@ -203,6 +244,9 @@ def run():
         for filename, content in original.items():
             (directory / filename).write_bytes(content)
         assert loader.run(verify_only=True)["action"] == "verified"
+        from tests.mysql_updates import run as update_regressions
+
+        update_regressions(directory, original)
     print(json.dumps({"event": "mysql_regressions_passed", "database": database}), flush=True)
 
 

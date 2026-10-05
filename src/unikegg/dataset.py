@@ -14,10 +14,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from unikegg import tsv
+from unikegg.organisms import DEFAULT_CODES, select
 
 TABLES = json.loads(Path(__file__).with_name("schema.json").read_text(encoding="utf-8"))
 BY_NAME = {table["name"]: table for table in TABLES}
-CODES = {"hsa", "mmu", "rno", "dre", "dme", "cel", "ath", "sce", "eco", "bsu"}
+CODES = set(DEFAULT_CODES)
 TEXT_LIMITS = {"TINYTEXT": 255, "TEXT": 65535, "MEDIUMTEXT": 16777215, "LONGTEXT": 4294967295}
 UINT_RE = re.compile(r"[0-9]+")
 DECIMAL_RE = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
@@ -67,6 +68,9 @@ def manifest(directory, kind, reviewed=None):
         "dataset_kind": kind,
         "reviewed_only": kind == "swissprot",
         "files": counts,
+        "organisms": list(
+            sorted({row["kegg_code"] for row in rows(directory, BY_NAME["ORGANISMO"])})
+        ),
     }
     destination = directory / "manifest.json"
     candidate = directory / f".unikegg-manifest-{uuid.uuid4().hex}.tmp"
@@ -255,8 +259,11 @@ def validate(directory, expected_kind="swissprot"):
             raise ValueError(f"Row count mismatch: {name}")
         for fk in table["fk"]:
             references.append((name, fk, reference_values[fk["column"]]))
-    if codes != CODES:
-        raise ValueError("Dataset must cover the configured ten organisms")
+    expected_codes = report.get("organisms", DEFAULT_CODES)
+    if not isinstance(expected_codes, (list, tuple)):
+        raise ValueError("Invalid manifest organism selection")
+    if codes != set(select(expected_codes)):
+        raise ValueError("Dataset does not cover the manifest organism selection")
     for name, fk, child_values in references:
         if child_values - values[(fk["parent"], fk["target"])]:
             raise ValueError(f"Orphan reference: {name}.{fk['column']}")

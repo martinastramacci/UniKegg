@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from unikegg import cli, loader
-from unikegg.acquire import kegg, uniprot
+from unikegg.acquire import common, kegg, uniprot
 from unikegg.dataset import sha256
 from unikegg.kegg_data import check_payload
 from unikegg.transforms import entities, relations
@@ -34,26 +34,24 @@ def test_unsupported_dry_run_rejected_before_dispatch(monkeypatch, command):
 def test_kegg_dry_run_no_network_or_files(tmp_path, monkeypatch):
     root, network = tmp_path / "absent", Mock()
     monkeypatch.setattr(kegg, "ROOT", root)
-    monkeypatch.setattr(kegg.urllib.request, "urlopen", network)
+    monkeypatch.setattr(common.urllib.request, "urlopen", network)
     kegg.run(dry_run=True)
     network.assert_not_called()
     assert not root.exists()
 
 
-def test_uniprot_entry_points_share_plan(tmp_path, monkeypatch):
-    download = Mock()
+def test_uniprot_entry_points_share_plan(tmp_path, monkeypatch, capsys):
+    network = Mock()
     monkeypatch.setattr(uniprot, "RAW", tmp_path)
-    monkeypatch.setattr(uniprot, "scarica", download)
-    monkeypatch.setattr(sys, "argv", ["unikegg", "download-uniprot", "--dry-run"])
-    cli.main()
-    cli_calls = download.call_args_list[:]
-    download.reset_mock()
+    monkeypatch.setattr(common.urllib.request, "urlopen", network)
+    cli.main(["download-uniprot", "--dry-run"])
+    cli_plan = capsys.readouterr().out
     monkeypatch.setattr(sys, "argv", ["uniprot", "--dry-run"])
     uniprot.main()
-    assert cli_calls == download.call_args_list
-    assert len(cli_calls) == 20
-    assert all(call.args[2] is True for call in cli_calls)
-    assert cli_calls[1].args[1].name == "9606_hsa.tsv.gz"
+    assert cli_plan == capsys.readouterr().out
+    assert cli_plan.count("GET ") == 10
+    assert "9606_hsa.tsv.gz" in cli_plan
+    network.assert_not_called()
     assert not list(tmp_path.iterdir())
 
 
@@ -61,7 +59,7 @@ def test_legacy_uniprot_name_reused_without_creating_duplicate(tmp_path, monkeyp
     monkeypatch.setattr(uniprot, "RAW", tmp_path)
     legacy = tmp_path / "9606_hsa.index.tsv.gz"
     legacy.write_bytes(b"synthetic placeholder; no network in this test")
-    assert uniprot.planned_requests()[1][1] == legacy
+    assert uniprot.planned_requests()[0][1] == legacy
     (tmp_path / "9606_hsa.tsv.gz").write_bytes(b"other")
     download = Mock()
     monkeypatch.setattr(uniprot, "scarica", download)
@@ -93,8 +91,8 @@ def test_invalid_kegg_cache_downloaded_again(tmp_path, monkeypatch, damage):
         (tmp_path / "manifest.jsonl").unlink()
     network = Mock(side_effect=lambda *args, **kwargs: io.BytesIO(GOOD_RECORD))
     monkeypatch.setattr(kegg, "ROOT", tmp_path)
-    monkeypatch.setattr(kegg.urllib.request, "urlopen", network)
-    monkeypatch.setattr(kegg.time, "sleep", lambda _: None)
+    monkeypatch.setattr(common.urllib.request, "urlopen", network)
+    monkeypatch.setattr(common.time, "sleep", lambda _: None)
     kegg.fetch(endpoint, relative)
     assert network.call_count == 1
     assert path.read_bytes() == GOOD_RECORD
@@ -108,7 +106,7 @@ def test_valid_and_empty_relationship_caches_reused(tmp_path, monkeypatch):
     cache(tmp_path, relative, endpoint, b"")
     network = Mock()
     monkeypatch.setattr(kegg, "ROOT", tmp_path)
-    monkeypatch.setattr(kegg.urllib.request, "urlopen", network)
+    monkeypatch.setattr(common.urllib.request, "urlopen", network)
     kegg.fetch(endpoint, relative)
     network.assert_not_called()
 
@@ -120,8 +118,8 @@ def test_incomplete_http_response_retried_four_times(tmp_path, monkeypatch):
     response.__exit__ = Mock(return_value=False)
     network = Mock(return_value=response)
     monkeypatch.setattr(kegg, "ROOT", tmp_path)
-    monkeypatch.setattr(kegg.urllib.request, "urlopen", network)
-    monkeypatch.setattr(kegg.time, "sleep", lambda _: None)
+    monkeypatch.setattr(common.urllib.request, "urlopen", network)
+    monkeypatch.setattr(common.time, "sleep", lambda _: None)
     with pytest.raises(http.client.IncompleteRead):
         kegg.fetch("/get/R00001", "details/reaction/R00001.txt")
     assert network.call_count == 4
@@ -133,8 +131,8 @@ def test_retry_recovers_from_interrupted_transfer(tmp_path, monkeypatch):
     attempts = [http.client.IncompleteRead(b"partial", 5), io.BytesIO(GOOD_RECORD)]
     network = Mock(side_effect=attempts)
     monkeypatch.setattr(kegg, "ROOT", tmp_path)
-    monkeypatch.setattr(kegg.urllib.request, "urlopen", network)
-    monkeypatch.setattr(kegg.time, "sleep", lambda _: None)
+    monkeypatch.setattr(common.urllib.request, "urlopen", network)
+    monkeypatch.setattr(common.time, "sleep", lambda _: None)
     kegg.fetch("/get/R00001", "details/reaction/R00001.txt")
     assert network.call_count == 2
     assert (tmp_path / "details/reaction/R00001.txt").read_bytes() == GOOD_RECORD
@@ -160,8 +158,8 @@ def test_failed_refresh_preserves_existing_file(tmp_path, monkeypatch):
     path.write_bytes(b"corrupted old cache")
     network = Mock(side_effect=TimeoutError("synthetic timeout"))
     monkeypatch.setattr(kegg, "ROOT", tmp_path)
-    monkeypatch.setattr(kegg.urllib.request, "urlopen", network)
-    monkeypatch.setattr(kegg.time, "sleep", lambda _: None)
+    monkeypatch.setattr(common.urllib.request, "urlopen", network)
+    monkeypatch.setattr(common.time, "sleep", lambda _: None)
     with pytest.raises(TimeoutError):
         kegg.fetch("/list/ko", "ko/ko_list.tsv")
     assert network.call_count == 4
@@ -172,7 +170,7 @@ def test_malformed_acquisition_manifest_fails_closed(tmp_path, monkeypatch):
     (tmp_path / "manifest.jsonl").write_text('{"truncated":')
     monkeypatch.setattr(kegg, "ROOT", tmp_path)
     network = Mock()
-    monkeypatch.setattr(kegg.urllib.request, "urlopen", network)
+    monkeypatch.setattr(common.urllib.request, "urlopen", network)
     with pytest.raises(ValueError, match="Invalid KEGG manifest"):
         kegg.fetch("/get/R00001", "details/reaction/R00001.txt")
     network.assert_not_called()
@@ -209,7 +207,7 @@ def test_uniprot_download_gzip_integrity_retry_and_cache(tmp_path, monkeypatch):
 
     monkeypatch.setattr(uniprot, "RAW_ROOT", tmp_path)
     monkeypatch.setattr(uniprot, "RAW", tmp_path / "uniprot")
-    monkeypatch.setattr(uniprot.time, "sleep", lambda _: None)
+    monkeypatch.setattr(common.time, "sleep", lambda _: None)
     payload = gzip.compress(b"Entry\tReviewed\nSYN000001\treviewed\n")
     network = Mock(side_effect=[io.BytesIO(payload[:-5]), io.BytesIO(payload)])
     monkeypatch.setattr(uniprot.urllib.request, "urlopen", network)

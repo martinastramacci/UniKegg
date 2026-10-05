@@ -8,6 +8,7 @@ from contextlib import suppress
 
 import mysql.connector
 
+from unikegg import versions
 from unikegg.config import PROCESSED, PROJECT
 from unikegg.dataset import TABLES, quote_for_mysql, verified_snapshot
 
@@ -75,18 +76,20 @@ def verify(connection, manifest):
         cursor.close()
 
 
-def run(verify_only=False):
+def run(verify_only=False, version_label=None):
+    versions.label_value(version_label)
     kind = os.environ.get("UNIKEGG_DATASET_KIND", "swissprot")
     with verified_snapshot(PROCESSED, kind) as (directory, manifest, fingerprint):
-        return _run(directory, manifest, fingerprint, kind, verify_only)
+        return _run(directory, manifest, fingerprint, kind, verify_only, version_label)
 
 
-def _run(directory, manifest, fingerprint, kind, verify_only):
+def _run(directory, manifest, fingerprint, kind, verify_only, version_label=None):
     connection = connect(directory)
     cursor = None
     locked = False
     try:
         cursor = connection.cursor()
+        cursor.execute("SET time_zone = '+00:00'")
         cursor.execute("SELECT GET_LOCK('unikegg_ingestion', 60)")
         locked = cursor.fetchone()[0] == 1
         if not locked:
@@ -94,11 +97,19 @@ def _run(directory, manifest, fingerprint, kind, verify_only):
         cursor.execute("SELECT dataset_sha256 FROM ETL_LOAD_STATE WHERE singleton_id=1")
         state = cursor.fetchone()
         if state and state[0] != fingerprint:
-            raise ValueError("The database contains a different dataset; use a separate volume")
+            raise ValueError(
+                "The database contains a different dataset; use update to synchronize it"
+            )
         if state or verify_only:
             if not state:
                 raise ValueError("Dataset has not been committed")
             verify(connection, manifest)
+            # Reuse the update comparison with SQL-typed temporary tables so
+            # NULLs, decimals and byte-sensitive annotations compare identically.
+            from unikegg.updater import stage, verify_exact
+
+            stage(cursor, directory, manifest)
+            verify_exact(cursor)
             print(
                 json.dumps({"event": "ready", "dataset_sha256": fingerprint, "action": "verified"}),
                 flush=True,
@@ -108,6 +119,7 @@ def _run(directory, manifest, fingerprint, kind, verify_only):
             cursor.execute(f"SELECT EXISTS(SELECT 1 FROM `{table['name']}`)")
             if cursor.fetchone()[0]:
                 raise ValueError("Nonempty database without load state; refusing to overwrite")
+        versions.ensure_schema(cursor, PROJECT)
         sql = (PROJECT / "db/load/001_ingest.sql").read_text(encoding="utf-8")
         quote_for_mysql(directory)
         statements = load_statements(sql, directory)
@@ -131,12 +143,35 @@ def _run(directory, manifest, fingerprint, kind, verify_only):
             "INSERT INTO ETL_LOAD_STATE(singleton_id,dataset_sha256,dataset_kind) VALUES (1,%s,%s)",
             (fingerprint, kind),
         )
+        version = versions.record(
+            cursor,
+            fingerprint,
+            kind,
+            manifest,
+            {
+                t["name"]: {
+                    "added": manifest["files"][t["file"]]["rows"],
+                    "modified": 0,
+                    "removed": 0,
+                }
+                for t in TABLES
+            },
+            "load",
+            version_label,
+        )
         connection.commit()
         print(
-            json.dumps({"event": "ready", "dataset_sha256": fingerprint, "action": "loaded"}),
+            json.dumps(
+                {
+                    "event": "ready",
+                    "dataset_sha256": fingerprint,
+                    "action": "loaded",
+                    "current_version": version,
+                }
+            ),
             flush=True,
         )
-        return {"action": "loaded", "dataset_sha256": fingerprint}
+        return {"action": "loaded", "dataset_sha256": fingerprint, "current_version": version}
     except Exception:
         with suppress(mysql.connector.Error):
             connection.rollback()

@@ -1,5 +1,6 @@
 """Source-preserving UniKegg acquisition and transformation routines."""
 
+import os
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -11,23 +12,13 @@ from unikegg.config import RAW
 from unikegg.identifiers import EC_RE
 from unikegg.kegg_data import detail_records as leggi_record_flat_file
 from unikegg.kegg_data import preflight, tabular_rows
+from unikegg.organisms import active, recorded_selection
 
 RAW_KEGG = RAW / "kegg"
 
 # Identificatore locale e codice KEGG: scelta del progetto (quali organismi).
 # taxonomy_id e nome scientifico sono invece ricavati dai dati.
-ORGANISMI = [
-    (1, "hsa"),
-    (2, "mmu"),
-    (3, "rno"),
-    (4, "dre"),
-    (5, "dme"),
-    (6, "cel"),
-    (7, "ath"),
-    (8, "sce"),
-    (9, "eco"),
-    (10, "bsu"),
-]
+ORGANISMI = [(o.id, o.code) for o in active()]
 ORG_DA_CODICE = {codice: org_id for org_id, codice in ORGANISMI}
 ORG_DA_TAXID: dict[str, int] = {}  # taxid (str) -> organism_id; riempito da costruisci_organismi()
 PROTEINE_ACC: set[str] = set()  # accession reviewed; riempito da costruisci_proteine_uniprot()
@@ -101,14 +92,10 @@ def dividi_gene(definizione: str) -> tuple[str, str]:
 
 
 def costruisci_organismi():
-    """Ricava taxonomy_id dal TSV UniProt e lo collega al codice KEGG.
+    """Use curated UniProt taxa for managed exports, empirical mapping for legacy raw.
 
-    KEGG non esporta il taxid NCBI in /list/genome; UniProt si'. Il ponte
-    empirico e' la colonna KEGG del TSV UniProt: ogni cross-reference e'
-    scritto come 'codice:gene' (es. hsa:10458), quindi contando i prefissi
-    per taxid si ricava la coppia codice <-> taxid direttamente dai dati.
-    Il caso eco e' risolto cosi' dai dati stessi: le entry UniProt di
-    E. coli K-12 stanno sotto il taxid 83333 e puntano ai geni KEGG eco.
+    KEGG and UniProt strain scopes need not use the same taxid (eco, ddi).
+    A managed export can legitimately contain zero reviewed proteins.
     """
     nomi_kegg = {}
     for _tid, descrizione in leggi_tsv(RAW_KEGG / "organism" / "organism_list.tsv"):
@@ -132,9 +119,15 @@ def costruisci_organismi():
             if codice in ORG_DA_CODICE:
                 xref_per_taxid[taxid][codice] += 1
 
+    managed = recorded_selection(Path(os.environ.get("UNIKEGG_REVIEWED_DIR", RAW / "uniprot")))
+
     # Voto di maggioranza: per ogni codice vince il taxid con piu' cross-ref.
     taxid_per_codice = {}
-    for codice in ORG_DA_CODICE:
+    for organism in active():
+        codice = organism.code
+        if managed:
+            taxid_per_codice[codice] = organism.taxid
+            continue
         candidati = sorted(
             (
                 (conteggi[codice], taxid)
@@ -152,8 +145,9 @@ def costruisci_organismi():
         raise ValueError(f"Collegamento codice -> taxid non biettivo: {taxid_per_codice}")
 
     righe = []
-    print("[02_produci_entita] Collegamento codice KEGG -> taxonomy_id ricavato dai dati UniProt:")
-    for org_id, codice in ORGANISMI:
+    print("[02_produci_entita] Collegamento codice KEGG -> taxonomy_id UniProt:")
+    for organism in active():
+        org_id, codice = organism.id, organism.code
         taxid = taxid_per_codice[codice]
         ORG_DA_TAXID[taxid] = org_id
         righe.append([org_id, codice, taxid, nomi_kegg[codice]])
@@ -168,36 +162,39 @@ def costruisci_organismi():
 
 
 def costruisci_geni_kegg():
-    righe = []
-    for codice, organism_id in ORG_DA_CODICE.items():
-        for riga in leggi_tsv(
-            RAW_KEGG / "genes" / f"{codice}_genes.tsv", columns=4, allow_empty=False
-        ):
-            # I raw hanno 4 colonne: id, tipo, posizione, descrizione.
-            # Conserviamo il tipo; la posizione genomica e' scartata per scope.
-            gene_id, tipo, _posizione, descrizione = riga[:4]
-            simbolo, definizione = dividi_gene(descrizione)
-            righe.append([gene_id, organism_id, tipo, simbolo, definizione])
+    def righe():
+        for codice, organism_id in ORG_DA_CODICE.items():
+            for riga in leggi_tsv(
+                RAW_KEGG / "genes" / f"{codice}_genes.tsv", columns=4, allow_empty=False
+            ):
+                # I raw hanno 4 colonne: id, tipo, posizione, descrizione.
+                # Conserviamo il tipo; la posizione genomica e' scartata per scope.
+                gene_id, tipo, _posizione, descrizione = riga[:4]
+                simbolo, definizione = dividi_gene(descrizione)
+                yield [gene_id, organism_id, tipo, simbolo, definizione]
+
     scrivi_tsv(
-        "gene_kegg.tsv", ["kegg_gene_id", "organism_id", "gene_type", "symbol", "definition"], righe
+        "gene_kegg.tsv",
+        ["kegg_gene_id", "organism_id", "gene_type", "symbol", "definition"],
+        righe(),
     )
 
 
 def costruisci_proteine_uniprot():
     if not ORG_DA_TAXID:
         raise RuntimeError("ORG_DA_TAXID vuoto: costruisci_organismi() deve girare prima.")
-    righe = []
-    for row in leggi_uniprot_tsv():
-        accession = row.get("Entry", "").strip()
-        taxid = row.get("Organism (ID)", "").strip()
-        if not accession or taxid not in ORG_DA_TAXID or accession in PROTEINE_ACC:
-            continue
-        PROTEINE_ACC.add(accession)
-        sequenza = row.get("Sequence", "").strip()
-        lunghezza = row.get("Length", "").strip() or str(len(sequenza))
-        massa = row.get("Mass", "").replace(",", "").strip() or "0"
-        righe.append(
-            [
+
+    def righe():
+        for row in leggi_uniprot_tsv():
+            accession = row.get("Entry", "").strip()
+            taxid = row.get("Organism (ID)", "").strip()
+            if not accession or taxid not in ORG_DA_TAXID or accession in PROTEINE_ACC:
+                continue
+            PROTEINE_ACC.add(accession)
+            sequenza = row.get("Sequence", "").strip()
+            lunghezza = row.get("Length", "").strip() or str(len(sequenza))
+            massa = row.get("Mass", "").replace(",", "").strip() or "0"
+            yield [
                 accession,
                 ORG_DA_TAXID[taxid],
                 row.get("Entry Name", "").strip(),
@@ -208,7 +205,7 @@ def costruisci_proteine_uniprot():
                 row.get("Sequence version", "").strip() or "1",
                 sequenza,
             ]
-        )
+
     scrivi_tsv(
         "protein_uniprot.tsv",
         [
@@ -222,15 +219,16 @@ def costruisci_proteine_uniprot():
             "sequence_version",
             "amino_acid_sequence",
         ],
-        righe,
+        righe(),
     )
 
 
 def costruisci_ortologia_kegg():
-    righe = []
-    for ko_id, descrizione in leggi_tsv(RAW_KEGG / "ko" / "ko_list.tsv"):
-        righe.append([senza_prefisso(ko_id), descrizione.split(";", 1)[0].strip(), descrizione])
-    scrivi_tsv("ortologia_kegg.tsv", ["ko_id", "name", "definition"], righe)
+    def righe():
+        for ko_id, descrizione in leggi_tsv(RAW_KEGG / "ko" / "ko_list.tsv"):
+            yield [senza_prefisso(ko_id), descrizione.split(";", 1)[0].strip(), descrizione]
+
+    scrivi_tsv("ortologia_kegg.tsv", ["ko_id", "name", "definition"], righe())
 
 
 def costruisci_pathway_riferimento():
@@ -242,13 +240,14 @@ def costruisci_pathway_riferimento():
 
 
 def costruisci_pathway_organismo():
-    righe = []
-    for codice, organism_id in ORG_DA_CODICE.items():
-        for pathway_id, _nome in leggi_tsv(RAW_KEGG / "pathway" / f"{codice}_pathways.tsv"):
-            pathway = senza_prefisso(pathway_id)
-            if pathway.startswith(codice):
-                righe.append([pathway, organism_id, "map" + pathway[-5:]])
-    scrivi_tsv("pathway_organismo.tsv", ["pathway_id", "organism_id", "map_id"], righe)
+    def righe():
+        for codice, organism_id in ORG_DA_CODICE.items():
+            for pathway_id, _nome in leggi_tsv(RAW_KEGG / "pathway" / f"{codice}_pathways.tsv"):
+                pathway = senza_prefisso(pathway_id)
+                if pathway.startswith(codice):
+                    yield [pathway, organism_id, "map" + pathway[-5:]]
+
+    scrivi_tsv("pathway_organismo.tsv", ["pathway_id", "organism_id", "map_id"], righe())
 
 
 def costruisci_reazioni(expected=None):
@@ -257,38 +256,37 @@ def costruisci_reazioni(expected=None):
     Gli EC finiscono in EC_KEGG e arricchiscono NUMERO_EC: l'associazione
     reazione <-> EC (tabella REAZIONE_EC) e' prodotta da 03_produci_relazioni.
     """
-    righe = []
-    for record in leggi_record_flat_file(RAW_KEGG / "details" / "reaction", expected):
-        reaction_id = primo_record(record, "ENTRY").split()[0]
-        EC_KEGG.update(EC_RE.findall(" ".join(record.get("ENZYME", []))))
-        righe.append(
-            [
+
+    def righe():
+        for record in leggi_record_flat_file(RAW_KEGG / "details" / "reaction", expected):
+            reaction_id = primo_record(record, "ENTRY").split()[0]
+            EC_KEGG.update(EC_RE.findall(" ".join(record.get("ENZYME", []))))
+            yield [
                 reaction_id,
                 testo_record(record, "NAME"),
                 testo_record(record, "DEFINITION"),
                 testo_record(record, "EQUATION"),
             ]
-        )
-    scrivi_tsv("reazione_kegg.tsv", ["reaction_id", "name", "definition", "equation"], righe)
+
+    scrivi_tsv("reazione_kegg.tsv", ["reaction_id", "name", "definition", "equation"], righe())
 
 
 def costruisci_composti(expected=None):
-    righe = []
-    for record in leggi_record_flat_file(RAW_KEGG / "details" / "compound", expected):
-        compound_id = primo_record(record, "ENTRY").split()[0]
-        righe.append(
-            [
+    def righe():
+        for record in leggi_record_flat_file(RAW_KEGG / "details" / "compound", expected):
+            compound_id = primo_record(record, "ENTRY").split()[0]
+            yield [
                 compound_id,
                 testo_record(record, "NAME").rstrip(";"),
                 testo_record(record, "FORMULA"),
                 testo_record(record, "EXACT_MASS"),
                 testo_record(record, "MOL_WEIGHT"),
             ]
-        )
+
     scrivi_tsv(
         "composto_kegg.tsv",
         ["compound_id", "name", "formula", "exact_mass", "molecular_weight"],
-        righe,
+        righe(),
     )
 
 
@@ -336,8 +334,6 @@ def stato_isoforma(valore: str) -> str:
 
 
 def costruisci_go_ec_isoforme():
-    if not PROTEINE_ACC:
-        raise RuntimeError("PROTEINE_ACC vuoto: costruisci_proteine_uniprot() deve girare prima.")
     go = {}
     ec_uniprot = set()
     isoforme, priorita = {}, {}
@@ -422,6 +418,8 @@ def costruisci_go_ec_isoforme():
 
 
 def main() -> None:
+    ORG_DA_CODICE.clear()
+    ORG_DA_CODICE.update({o.code: o.id for o in active()})
     required = preflight(RAW_KEGG, ORG_DA_CODICE)
     ORG_DA_TAXID.clear()
     PROTEINE_ACC.clear()

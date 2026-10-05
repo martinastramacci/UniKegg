@@ -133,7 +133,7 @@ erDiagram
     NUMERO_EC ||--o{ REAZIONE_EC : "ec_number"
 ```
 
-Twenty domain tables are shown. `ETL_LOAD_STATE` is operational metadata and is intentionally outside the biological ER diagram.
+Twenty domain tables are shown. `ETL_LOAD_STATE` and `ETL_DATASET_HISTORY` are operational metadata outside the biological ER diagram. `ETL_LOAD_STATE.current_version` identifies the currently committed version. History stores sequential versions, UTC timestamps, fingerprints, labels, manifests and logical change counts; see [dataset updates](updates.md).
 
 ## Relation grain and constraints
 
@@ -166,3 +166,5 @@ Additional unique keys are `ORGANISMO.kegg_code`, `ORGANISMO.taxonomy_id`, `PROT
 
 The principal integration traversal is `ORGANISMO → GENE_KEGG → GENE_PROTEINA → PROTEIN_UNIPROT`. The same gene links to KEGG orthology and pathway dimensions, while the protein links to GO and EC dimensions. Reaction-level integration can traverse orthology/reaction mappings or EC assignments; these paths encode different source assertions and should not be treated as interchangeable evidence.
 
+
+The curated acquisition catalog uses distinct UniProt taxids and preserves the existing unique constraints; no SQL migration is required. `ORGANISMO.taxonomy_id` is the UniProt query taxid, which may differ from the KEGG genome taxid for explicit curated scope aliases. Local IDs remain stable even for a subset. The processed manifest declares the selected codes; legacy manifests without that declaration retain the ten-organism contract.

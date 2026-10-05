@@ -4,12 +4,15 @@ import json
 import os
 import shutil
 import sys
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory, mkdtemp
 
+from unikegg.acquire.common import file_lock
 from unikegg.acquire.reviewed import reviewed_rows
+from unikegg.config import RAW
 from unikegg.dataset import TABLES, manifest, validate
+from unikegg.organisms import recorded_selection, select, selection
 from unikegg.transforms import entities, relations
 
 
@@ -79,7 +82,21 @@ def publish(stage, directory):
             print(f"Dataset published; old backup retained at {previous}: {error}", file=sys.stderr)
 
 
-def run(directory, reviewed_export=None):
+def run(directory, reviewed_export=None, codes=None):
+    reviewed = Path(reviewed_export or os.environ.get("UNIKEGG_REVIEWED_DIR", RAW / "uniprot"))
+    with ExitStack() as stack:
+        # Managed sources and transformation must never mutate/read each other.
+        # Legacy read-only manual exports keep their existing contract.
+        for root in (entities.RAW_KEGG, reviewed):
+            if (root / "selection.json").exists() or (root / ".acquisition.lock").exists():
+                stack.enter_context(file_lock(root / ".acquisition.lock"))
+        state = recorded_selection(entities.RAW_KEGG)
+        selected = select(codes if codes is not None else state["codes"] if state else None)
+        with selection(selected):
+            return _run(directory, reviewed_export)
+
+
+def _run(directory, reviewed_export=None):
     directory = Path(directory).resolve()
     directory.parent.mkdir(parents=True, exist_ok=True)
     old_output, old_relations, old_reports = entities.OUTPUT, relations.OUTPUT, relations.CONTROLLI

@@ -8,7 +8,7 @@ import mysql.connector
 import pytest
 
 from tests.make_fixture import generate
-from unikegg import loader
+from unikegg import loader, updater
 from unikegg.dataset import TABLES, validate
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +41,7 @@ class Connection:
                     self.result = (int(connection.nonempty),)
                 elif sql.startswith("SELECT COUNT(*) FROM `") and "LEFT JOIN" not in sql:
                     table_name = re.search(r"FROM `([^`]+)`", sql)[1]
+                    table_name = table_name.removeprefix(updater.STAGE)
                     table = next(t for t in TABLES if t["name"] == table_name)
                     self.result = (connection.report["files"][table["file"]]["rows"],)
                 elif sql.strip().startswith("LOAD DATA") and connection.warning:
@@ -107,11 +108,12 @@ def test_loader_branches(tmp_path, monkeypatch, mode):
     releases = sum("RELEASE_LOCK" in sql for sql, _ in connection.queries)
     assert releases == (mode not in {"lock-denied", "cursor-error"})
     loads = sum(sql.strip().startswith("LOAD DATA") for sql, _ in connection.queries)
-    assert loads == (20 if mode == "new" else 1 if mode == "warning" else 0)
+    assert loads == (20 if mode in {"new", "repeat"} else 1 if mode == "warning" else 0)
     assert snapshots and not snapshots[0].exists()
 
 
-def test_no_db_connection_for_invalid_bundle(tmp_path, monkeypatch):
+@pytest.mark.parametrize("run", [loader.run, updater.run])
+def test_no_db_connection_for_invalid_bundle(tmp_path, monkeypatch, run):
     directory = generate(tmp_path)
     (directory / "numero_ec.tsv").write_text("modified without updating the manifest\n")
     connect = Mock()
@@ -119,7 +121,7 @@ def test_no_db_connection_for_invalid_bundle(tmp_path, monkeypatch):
     monkeypatch.setattr(loader, "connect", connect)
     monkeypatch.setenv("UNIKEGG_DATASET_KIND", "synthetic")
     with pytest.raises(ValueError, match="Checksum mismatch"):
-        loader.run()
+        run()
     connect.assert_not_called()
 
 

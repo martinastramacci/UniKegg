@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from unikegg.dataset import CODES, sha256
+from unikegg.organisms import BY_CODE, recorded_selection
 
 
 def strip_prefix(value):
@@ -58,7 +59,20 @@ def flat_records(lines, source):
 def detail_records(directory, expected=None):
     """Require complete, unique records; empty details are valid only when selected so."""
     directory = Path(directory)
-    paths = sorted(directory.glob("*.txt"))
+    index = directory / "active.json"
+    if index.exists():
+        entries = json.loads(index.read_text(encoding="utf-8"))
+        paths = []
+        for item in entries:
+            relative = Path(item["file"])
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("Invalid KEGG detail index path")
+            path = directory / relative
+            if sha256(path) != item["sha256"]:
+                raise ValueError(f"KEGG detail checksum mismatch: {path}")
+            paths.append(path)
+    else:
+        paths = sorted(directory.glob("*.txt"))
     if not paths and (expected is None or expected):
         raise FileNotFoundError(f"Missing KEGG detail files: {directory}")
     seen = set()
@@ -71,7 +85,8 @@ def detail_records(directory, expected=None):
                     raise ValueError(f"Duplicate KEGG ENTRY {identifier}: {path}")
                 seen.add(identifier)
                 count += 1
-                yield record
+                if expected is None or identifier in expected:
+                    yield record
         if not count:
             raise ValueError(f"Empty KEGG detail file: {path}")
     if expected is not None and (missing := set(expected) - seen):
@@ -110,7 +125,7 @@ def check_payload(endpoint, payload):
         if len(found) != len(set(found)) or set(found) != wanted:
             raise ValueError(f"Incomplete/duplicate KEGG record batch: {endpoint}")
     else:
-        genes = endpoint in {f"/list/{code}" for code in CODES}
+        genes = endpoint in {f"/list/{code}" for code in BY_CODE}
         allow_empty = endpoint.startswith(("/link/", "/conv/", "/list/pathway/"))
         # Exhaust the generator so malformed trailing rows cannot go unnoticed.
         for _ in tabular_lines(io.StringIO(text), endpoint, 4 if genes else 2, allow_empty):
@@ -176,6 +191,9 @@ def preflight(root, codes=CODES):
     appear in any input cannot be inferred without an authoritative snapshot.
     """
     root = Path(root)
+    state = recorded_selection(root)
+    if state and not set(codes) <= set(state["codes"]):
+        raise ValueError("KEGG acquisition does not cover selected organisms")
     metadata = acquisition_manifest(root)
     for endpoint, relative in requests(codes):
         path = root / relative

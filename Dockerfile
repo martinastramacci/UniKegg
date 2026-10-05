@@ -4,7 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     UNIKEGG_HOME=/app \
-    UNIKEGG_DATA_DIR=/data
+    UNIKEGG_DATA_DIR=/data \
+    TMPDIR=/app/tmp
 
 WORKDIR /app
 COPY requirements.txt pyproject.toml ./
@@ -14,8 +15,8 @@ COPY db ./db
 RUN pip install --no-cache-dir --no-deps . \
     && groupadd --gid 10001 unikegg \
     && useradd --uid 10001 --gid unikegg --no-create-home unikegg \
-    && mkdir -p /app/artifacts \
-    && chown unikegg:unikegg /app/artifacts
+    && mkdir -p /app/artifacts /app/tmp \
+    && chown unikegg:unikegg /app/artifacts /app/tmp
 
 USER 10001:10001
 ENTRYPOINT ["unikegg"]

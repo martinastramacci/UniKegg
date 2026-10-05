@@ -53,3 +53,12 @@ def test_mysql_regression_runner_requires_explicit_opt_in(monkeypatch):
     monkeypatch.delenv("UNIKEGG_MYSQL_TEST_DATABASE", raising=False)
     with pytest.raises(RuntimeError, match="opt-in"):
         mysql_integration.run()
+
+
+def test_etl_temporary_storage_is_on_disk():
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    assert "etl_tmp:/app/tmp" in compose["services"]["etl"]["volumes"]
+    assert "etl_tmp" in compose["volumes"]
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    assert "TMPDIR=/app/tmp" in dockerfile
+    assert "chown unikegg:unikegg /app/artifacts /app/tmp" in dockerfile

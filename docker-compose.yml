@@ -44,6 +44,7 @@ services:
     volumes:
       - ${UNIKEGG_PROCESSED_DIR:-./data/processed}:/data/processed:ro
       - ./data/raw:/data/raw:ro
+      - etl_tmp:/app/tmp
     read_only: true
     tmpfs:
       - /tmp
@@ -51,3 +52,4 @@ services:
 
 volumes:
   mysql_data:
+  etl_tmp:

@@ -108,7 +108,7 @@ def test_loader_branches(tmp_path, monkeypatch, mode):
     releases = sum("RELEASE_LOCK" in sql for sql, _ in connection.queries)
     assert releases == (mode not in {"lock-denied", "cursor-error"})
     loads = sum(sql.strip().startswith("LOAD DATA") for sql, _ in connection.queries)
-    assert loads == (20 if mode in {"new", "repeat"} else 1 if mode == "warning" else 0)
+    assert loads == (22 if mode in {"new", "repeat"} else 1 if mode == "warning" else 0)
     assert snapshots and not snapshots[0].exists()
 
 

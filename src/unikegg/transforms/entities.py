@@ -11,7 +11,7 @@ from unikegg.config import PROCESSED as OUTPUT
 from unikegg.config import RAW
 from unikegg.identifiers import EC_RE
 from unikegg.kegg_data import detail_records as leggi_record_flat_file
-from unikegg.kegg_data import preflight, tabular_rows
+from unikegg.kegg_data import orthology_links, preflight, tabular_rows
 from unikegg.organisms import active, recorded_selection
 
 RAW_KEGG = RAW / "kegg"
@@ -22,7 +22,7 @@ ORGANISMI = [(o.id, o.code) for o in active()]
 ORG_DA_CODICE = {codice: org_id for org_id, codice in ORGANISMI}
 ORG_DA_TAXID: dict[str, int] = {}  # taxid (str) -> organism_id; riempito da costruisci_organismi()
 PROTEINE_ACC: set[str] = set()  # accession reviewed; riempito da costruisci_proteine_uniprot()
-EC_KEGG: set[str] = set()  # EC dal campo ENZYME delle reazioni; riempito da costruisci_reazioni()
+EC_KEGG: set[str] = set()  # EC dalle reazioni e dai link diretti KO -> EC.
 
 # Valori letterali del campo Sequence= di UniProt e loro traduzione nel
 # dominio ENUM dello schema. Nel TSV il quarto caso non appare come
@@ -424,6 +424,7 @@ def main() -> None:
     ORG_DA_TAXID.clear()
     PROTEINE_ACC.clear()
     EC_KEGG.clear()
+    EC_KEGG.update(ec for _, ec in orthology_links(RAW_KEGG, "ec"))
     costruisci_organismi()  # riempie ORG_DA_TAXID dai dati UniProt
     costruisci_proteine_uniprot()  # riempie PROTEINE_ACC
     costruisci_geni_kegg()

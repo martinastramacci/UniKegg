@@ -185,7 +185,7 @@ def validate(directory, expected_kind="swissprot"):
         raise ValueError("Swiss-Prot provenance declaration is required")
     files = report.get("files")
     if not isinstance(files, dict) or set(files) != {t["file"] for t in TABLES}:
-        raise ValueError("Expected twenty dataset files")
+        raise ValueError(f"Expected {len(TABLES)} dataset files")
     for filename, info in files.items():
         if (
             not isinstance(info, dict)
@@ -268,7 +268,8 @@ def validate(directory, expected_kind="swissprot"):
         if child_values - values[(fk["parent"], fk["target"])]:
             raise ValueError(f"Orphan reference: {name}.{fk['column']}")
     print(
-        json.dumps({"event": "dataset_validated", "tables": 20, "kind": expected_kind}), flush=True
+        json.dumps({"event": "dataset_validated", "tables": len(TABLES), "kind": expected_kind}),
+        flush=True,
     )
     return report, sha256(directory / "manifest.json")
 

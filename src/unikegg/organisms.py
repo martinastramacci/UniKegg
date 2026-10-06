@@ -41,7 +41,7 @@ CATALOG = tuple(
     )
 )
 BY_CODE = {o.code: o for o in CATALOG}
-DEFAULT_CODES = tuple(o.code for o in CATALOG[:10])
+DEFAULT_CODES = tuple(o.code for o in CATALOG)
 _SELECTION = ContextVar("unikegg_organisms", default=DEFAULT_CODES)
 
 

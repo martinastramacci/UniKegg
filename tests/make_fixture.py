@@ -1,4 +1,4 @@
-"""Generate invented records for all twenty tables; contains no upstream data."""
+"""Generate invented records for all twenty-two tables; contains no upstream data."""
 
 import argparse
 import csv
@@ -35,6 +35,8 @@ def generate(directory, edge_cases=False, legacy_quoting=False):
         data["GENE_PATHWAY"].append([gene, pathway])
         data["PROTEINA_GO"].append([accession, "GO:0000001", "", ""])
         data["PROTEINA_EC"].append([accession, "1.1.1.1"])
+    data["ORTOLOGIA_PATHWAY"] = [["K00001", "map00010"]]
+    data["ORTOLOGIA_EC"] = [["K00001", "1.1.1.1"]]
     data["ORTOLOGIA_REAZIONE"] = [["K00001", "R00001"]]
     data["PATHWAY_REAZIONE"] = [["map00010", "R00001"]]
     data["REAZIONE_COMPOSTO"] = [["R00001", "C00001"]]

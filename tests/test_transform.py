@@ -49,7 +49,7 @@ def test_raw_transform_repeat_and_external_reports(tmp_path):
     processed = home / "data/processed"
     before = contents(processed)
     report, _ = validate(processed)
-    assert len(report["files"]) == 20
+    assert len(report["files"]) == 22
     assert all(item["rows"] for item in report["files"].values())
     assert (report_dir / "report_gene_proteina.tsv").is_file()
     assert b'"3.5.1.n3"' in before["numero_ec.tsv"]

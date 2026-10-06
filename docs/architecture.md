@@ -9,7 +9,7 @@ flowchart TB
       KR --> T[Entity and relationship transforms]
       G --> T
     end
-    T --> D[20 TSV files + integrity manifest]
+    T --> D[22 TSV files + integrity manifest]
     subgraph Compose[Two-service local Compose deployment]
       D -->|read-only bind mount| E[Python ETL container]
       I[DDL initialization scripts] --> M[(MySQL container)]

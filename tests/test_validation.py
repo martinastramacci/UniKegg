@@ -194,7 +194,7 @@ def test_private_transport_preserves_values_and_source_bundle(tmp_path):
         expected = {table["name"]: list(rows(snapshot, table)) for table in TABLES}
         quote_for_mysql(snapshot)
         assert '"NULL"' in (snapshot / "gene_kegg.tsv").read_text()
-        assert len(fingerprint) == 64 and len(report["files"]) == 20
+        assert len(fingerprint) == 64 and len(report["files"]) == 22
         for table in TABLES:
             assert list(rows(snapshot, table)) == expected[table["name"]]
         assert snapshot.exists()
@@ -217,7 +217,7 @@ def test_column_contract_matches_ddl():
     import re
 
     sql = (Path(__file__).resolve().parents[1] / "db/init/001_schema.sql").read_text()
-    blocks = dict(re.findall(r"CREATE TABLE (\w+) \((.*?)\n\);", sql, re.S))
+    blocks = dict(re.findall(r"CREATE TABLE (\w+) \((.*?)\n\)(?: ENGINE = InnoDB)?;", sql, re.S))
     assert set(blocks) == set(BY_NAME)
     for table in TABLES:
         block = blocks[table["name"]]

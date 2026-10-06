@@ -82,6 +82,14 @@ erDiagram
         varchar kegg_gene_id PK,FK
         varchar pathway_id PK,FK
     }
+    ORTOLOGIA_PATHWAY {
+        char ko_id PK,FK
+        char map_id PK,FK
+    }
+    ORTOLOGIA_EC {
+        char ko_id PK,FK
+        varchar ec_number PK,FK
+    }
     ORTOLOGIA_REAZIONE {
         char ko_id PK,FK
         char reaction_id PK,FK
@@ -119,6 +127,10 @@ erDiagram
     ORTOLOGIA_KEGG ||--o{ GENE_ORTOLOGIA : "ko_id"
     GENE_KEGG ||--o{ GENE_PATHWAY : "kegg_gene_id"
     PATHWAY_ORGANISMO ||--o{ GENE_PATHWAY : "pathway_id"
+    ORTOLOGIA_KEGG ||--o{ ORTOLOGIA_PATHWAY : "ko_id"
+    PATHWAY_RIFERIMENTO ||--o{ ORTOLOGIA_PATHWAY : "map_id"
+    ORTOLOGIA_KEGG ||--o{ ORTOLOGIA_EC : "ko_id"
+    NUMERO_EC ||--o{ ORTOLOGIA_EC : "ec_number"
     ORTOLOGIA_KEGG ||--o{ ORTOLOGIA_REAZIONE : "ko_id"
     REAZIONE_KEGG ||--o{ ORTOLOGIA_REAZIONE : "reaction_id"
     PATHWAY_RIFERIMENTO ||--o{ PATHWAY_REAZIONE : "map_id"
@@ -133,7 +145,7 @@ erDiagram
     NUMERO_EC ||--o{ REAZIONE_EC : "ec_number"
 ```
 
-Twenty domain tables are shown. `ETL_LOAD_STATE` and `ETL_DATASET_HISTORY` are operational metadata outside the biological ER diagram. `ETL_LOAD_STATE.current_version` identifies the currently committed version. History stores sequential versions, UTC timestamps, fingerprints, labels, manifests and logical change counts; see [dataset updates](updates.md).
+Twenty-two domain tables are shown. `ETL_LOAD_STATE` and `ETL_DATASET_HISTORY` are operational metadata outside the biological ER diagram. `ETL_LOAD_STATE.current_version` identifies the currently committed version. History stores sequential versions, UTC timestamps, fingerprints, labels, manifests and logical change counts; see [dataset updates](updates.md).
 
 ## Relation grain and constraints
 
@@ -153,6 +165,8 @@ Twenty domain tables are shown. `ETL_LOAD_STATE` and `ETL_DATASET_HISTORY` are o
 | `GENE_PROTEINA` | `kegg_gene_id, accession, mapping_source` | Gene/protein mapping per source |
 | `GENE_ORTOLOGIA` | `kegg_gene_id, ko_id` | Gene/orthology assignment |
 | `GENE_PATHWAY` | `kegg_gene_id, pathway_id` | Gene/pathway membership |
+| `ORTOLOGIA_PATHWAY` | `ko_id, map_id` | Direct KO/reference pathway membership |
+| `ORTOLOGIA_EC` | `ko_id, ec_number` | Direct KO/EC assignment |
 | `ORTOLOGIA_REAZIONE` | `ko_id, reaction_id` | Orthology/reaction association |
 | `PATHWAY_REAZIONE` | `map_id, reaction_id` | Reference pathway/reaction membership |
 | `REAZIONE_COMPOSTO` | `reaction_id, compound_id` | Reaction/compound association |
@@ -168,3 +182,5 @@ The principal integration traversal is `ORGANISMO → GENE_KEGG → GENE_PROTEIN
 
 
 The curated acquisition catalog uses distinct UniProt taxids and preserves the existing unique constraints; no SQL migration is required. `ORGANISMO.taxonomy_id` is the UniProt query taxid, which may differ from the KEGG genome taxid for explicit curated scope aliases. Local IDs remain stable even for a subset. The processed manifest declares the selected codes; legacy manifests without that declaration retain the ten-organism contract.
+
+The two KO bridges use InnoDB, composite primary keys, non-null foreign keys and reverse-lookup indexes (`map_id`, `ec_number`). `ON DELETE RESTRICT ON UPDATE RESTRICT` protects reference catalogs; synchronization removes dependent links before changing parents. Participation is optional: KO groups need not have an EC or pathway annotation. Direct KO assertions are not inferred from reaction or protein links. `path:koNNNNN` and `path:mapNNNNN` normalize to `mapNNNNN`; species-specific pathways remain distinct. See the [migration and source semantics](orthology-migration.md).

@@ -32,7 +32,7 @@ def rewrite(directory, filename, mutate):
 
 def test_complete_fixture(tmp_path):
     report, fingerprint = validate(generate(tmp_path), "synthetic")
-    assert len(report["files"]) == 20
+    assert len(report["files"]) == 22
     assert len(fingerprint) == 64
 
 

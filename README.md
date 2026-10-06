@@ -8,7 +8,7 @@ UniKegg integrates KEGG genes, orthology groups, pathways, reactions and compoun
 
 Swiss-Prot is the protein reference set because its manually reviewed annotations provide a curated basis for protein identity, sequence metadata and functional interpretation. Acquisition explicitly requests `reviewed:true`; transformation rejects records whose `Reviewed` field is not `reviewed`. KEGG-to-protein mappings are retained only when both endpoints exist in the selected dataset. Manual review improves semantic reliability; it does **not** itself guarantee referential integrity. Primary keys, foreign keys, domain constraints and cross-organism validation enforce the relational contract.
 
-Acquisition supports a curated catalog of **16 model and reference organisms**, retaining the original ten as the default. Select explicit codes with `--organisms hsa,eco,spo`, the first N with `--limit 12`, or all sixteen with `--all-organisms`. Run `unikegg list-organisms` to inspect the catalog. Both sources share the same selection; TSV downloads resume from verified UniProt pages and respect server retry delays. See the [download guide and organism catalog](docs/acquisition.md).
+Acquisition supports a curated catalog of **16 model and reference organisms**, with all sixteen as the default. Select explicit codes with `--organisms hsa,eco,spo` or the first N with `--limit 12`. Run `unikegg list-organisms` to inspect the catalog. Both sources share the same selection; TSV downloads resume from verified UniProt pages and respect server retry delays. See the [download guide and organism catalog](docs/acquisition.md).
 
 UniProt also supports automatic organism batches and cumulative downloads across sessions:
 
@@ -23,7 +23,7 @@ unikegg download-uniprot --all-organisms --batch-size 4 --batch 1 --append
 
 Use `--batch 2`, `--batch 3` and `--batch 4` with the same options for the remaining groups. Batches run sequentially, retain one reviewed TSV gzip per organism, and reject mixed UniProt releases. `--append` reuses verified earlier exports; combined with `--refresh`, it refreshes the entire cumulative selection. Resume an interrupted command with the same options but without `--refresh`.
 
-The prepared local snapshot contains 10 organisms, 20 domain tables, 2,006,370 rows, 89,601 reviewed protein records and 200,249 KEGG genes. These figures describe this snapshot, not a guarantee about future upstream releases. Acquisition is optional and is never started by the demo. Regeneration with updated parsers can change bytes, counts and fingerprints; the historical snapshot counts are not an acceptance target for new exports.
+The historical local snapshot contains 16 organisms, 20 domain tables, over 3,000,000 rows, over 100,000 reviewed protein records and over 250,000 KEGG genes. These figures describe this snapshot, not a guarantee about future upstream releases. Acquisition is optional and is never started by the demo. Regeneration with updated parsers can change bytes, counts and fingerprints; the historical snapshot counts are not an acceptance target for new exports.
 
 ## System Architecture & Database Schema
 
@@ -36,14 +36,15 @@ UniKegg/
 │   ├── loader.py             # Transactional MySQL bulk ingestion
 │   ├── updater.py            # Full synchronization of an existing database
 │   ├── versions.py           # Current version and dated history
-│   └── schema.json           # Machine-readable 20-table contract
+│   └── schema.json           # Machine-readable 22-table contract
 ├── db/
 │   ├── init/                 # DDL applied to a new MySQL volume
+│   ├── migrations/           # Additive upgrades for existing databases
 │   ├── load/                 # Parameterized bulk-ingestion SQL
 │   └── queries/              # 30 cross-resource SQL queries
 ├── data/
 │   ├── raw/                  # Authorized upstream exports; ignored by Git
-│   ├── processed/            # 20 TSV files and manifest; ignored by Git
+│   ├── processed/            # 22 TSV files and manifest; ignored by Git
 │   └── manifests/            # Optional external provenance records; ignored
 ├── docs/                     # Architecture, ER diagram and operations
 ├── tests/                    # Synthetic fixture generator and contract tests
@@ -61,14 +62,16 @@ flowchart LR
     K[KEGG exports] --> P[Entity and relationship parsers]
     U[UniProtKB / Swiss-Prot<br/>reviewed:true] --> G[Reviewed-status gate]
     G --> P
-    P --> T[20 UTF-8 TSV files + manifest]
+    P --> T[22 UTF-8 TSV files + manifest]
     T --> V[Checksums, keys, domains,<br/>sequences and species checks]
     V --> L[Transactional bulk ingestion]
-    L --> M[(MySQL 8.0<br/>20 domain tables)]
+    L --> M[(MySQL 8.0<br/>22 domain tables)]
     M --> Q[Integrated SQL queries]
 ```
 
 The schema separates biological entities from many-to-many associations. `GENE_PROTEINA` is the principal KEGG/Swiss-Prot integration bridge and retains mapping provenance (`KEGG_CONV` or `UNIPROT_DR`). Reference pathways are distinct from organism-specific pathways. GO terms and EC identifiers are deduplicated dimensions. Isoforms reference canonical protein accessions. The existing SQL identifiers are preserved for compatibility; see the [logical schema and ER diagram](docs/schema.md).
+
+The database now supports direct many-to-many mappings between enzymes (EC), orthology groups (KO) and reference pathways through `ORTOLOGIA_EC` and `ORTOLOGIA_PATHWAY`. These preserve explicit KEGG assertions, including EC identifiers found only in KO links; they enable `Gene → KO → Pathway` and `EC → KO → Pathway` queries. The current contract contains **22 domain tables and 22 TSVs**. Existing 20-table snapshots and databases require the [KO migration and regeneration procedure](docs/orthology-migration.md).
 
 Two infrastructure tables record dataset versions: `ETL_LOAD_STATE` stores the committed fingerprint and `current_version`; `ETL_DATASET_HISTORY` stores previous versions, UTC dates, labels and change counts. They are outside the biological domain schema. Foreign-key checks remain enabled. The loader rejects MySQL warnings and rolls back uncommitted data on failure. A repeat load of the same manifest verifies the existing database; a different manifest or an unexplained nonempty database is rejected instead of overwritten.
 
@@ -108,11 +111,11 @@ pytest -q
 
 For runtime-only use, install `requirements.txt` instead. The local CLI reads environment variables, not `.env` files. Explicit download commands are `unikegg download-uniprot` and `unikegg download-kegg`; append `--dry-run` to inspect requests without contacting the upstream APIs. `unikegg update --dry-run` previews database synchronization; other commands reject this flag. Run `unikegg transform` only after authorized raw exports are available under `data/raw/`. See [operations](docs/operations.md) for source layout, manifest generation and failure handling.
 
-GitHub Actions runs Ruff, SQLFluff with the MySQL dialect and unit tests, then starts both Compose services on an ephemeral runner. Integration uses invented fixtures covering all 20 domain tables and 10 organism codes. It tests automatic initialization, successful loading, verification and a repeated load. A separate, initially empty regression database tests warning-triggered rollback, concurrent loaders, all-field TSV/SQL round trips (including legacy literal `NULL` and long sequences), all 30 integration queries, full synchronization, preview, concurrent updates, rollback of data and history, and metadata migration on legacy databases. Unit tests cover raw transformation and fail-closed acquisition using invented data and mocked HTTP. CI tests Python 3.11/3.12 and audits Python dependencies. It does not download or publish upstream datasets.
+GitHub Actions runs Ruff, SQLFluff with the MySQL dialect and unit tests, then starts both Compose services on an ephemeral runner. Integration uses invented fixtures covering all 22 domain tables and 16 organism codes. It tests automatic initialization, successful loading, verification and a repeated load. A separate, initially empty regression database tests warning-triggered rollback, concurrent loaders, all-field TSV/SQL round trips (including legacy literal `NULL` and long sequences), all 30 integration queries, full synchronization, preview, concurrent updates, rollback of data and history, and metadata migration on legacy databases. Unit tests cover raw transformation and fail-closed acquisition using invented data and mocked HTTP. CI tests Python 3.11/3.12 and audits Python dependencies. It does not download or publish upstream datasets.
 
 ## Updating an existing database
 
-After preparing a new validated dataset, synchronize existing records without rebuilding MySQL:
+For a database created before the KO extension, first apply the [additive SQL migration](docs/orthology-migration.md). After preparing a new validated dataset, synchronize existing records without rebuilding MySQL:
 
 ```bash
 unikegg update --dry-run
@@ -124,7 +127,7 @@ Synchronization adds, changes and removes records to match the complete new data
 
 ## Quickstart / Demo Environment
 
-For the prepared local distribution, `data/processed/` already contains the 20 real TSV files and their validated manifest. Start the complete offline-data demo with:
+The offline demo requires a validated **22-file** bundle in `data/processed/`. The historical local distribution contains 20 files and must first be [regenerated](docs/orthology-migration.md). With the current bundle and, for existing volumes, the migrated schema, start the demo with:
 
 ```bash
 docker compose up --build
@@ -157,11 +160,11 @@ GROUP BY o.kegg_code
 ORDER BY o.kegg_code;
 ```
 
-Expected prepared-snapshot results are 10 organisms, 89,601 reviewed proteins and zero invalid sequence lengths. `COUNT(DISTINCT ...)` avoids double-counting a mapping reported by both sources. Additional read-only queries are mounted inside MySQL at `/queries/integration.sql`; execute `SOURCE /queries/integration.sql;` in its interactive client. Query results describe integrated annotations, not experimentally demonstrated activity.
+Expected prepared-snapshot results are 16 organisms, over 100,000 reviewed proteins and zero invalid sequence lengths. `COUNT(DISTINCT ...)` avoids double-counting a mapping reported by both sources. Additional read-only queries are mounted inside MySQL at `/queries/integration.sql`; execute `SOURCE /queries/integration.sql;` in its interactive client. Query results describe integrated annotations, not experimentally demonstrated activity.
 
 ### Public-clone behavior
 
-Real TSVs, upstream exports and SQL dumps are deliberately excluded from Git. A public clone therefore does **not** contain the real snapshot. Supply an authorized 20-file bundle with its `manifest.json` under `data/processed/`, then run the same Compose command. A missing or mismatched manifest fails explicitly. Do not manufacture a Swiss-Prot declaration for unverified data.
+Real TSVs, upstream exports and SQL dumps are deliberately excluded from Git. A public clone therefore does **not** contain the real snapshot. Supply an authorized 22-file bundle with its `manifest.json` under `data/processed/`, then run the same Compose command. A missing or mismatched manifest fails explicitly. Do not manufacture a Swiss-Prot declaration for unverified data.
 
 For an upstream-independent smoke test from a public clone, generate explicitly synthetic data after installing the Python package:
 
@@ -178,7 +181,7 @@ COMPOSE_PROJECT_NAME=unikegg-synthetic
 MYSQL_PORT=3308
 ```
 
-This fixture has 10 invented protein records. It is neither a Swiss-Prot export nor a substitute for biological validation. Real and synthetic modes cannot silently overwrite each other. `docker compose down` stops the services while preserving database storage; do not add `--volumes` unless intentionally discarding that project's database.
+This fixture has 16 invented protein records. It is neither a Swiss-Prot export nor a substitute for biological validation. Real and synthetic modes cannot silently overwrite each other. `docker compose down` stops the services while preserving database storage; do not add `--volumes` unless intentionally discarding that project's database.
 
 ## Data Governance & Upstream Licenses
 

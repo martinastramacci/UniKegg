@@ -13,6 +13,7 @@ from unikegg import cli, loader
 from unikegg.acquire import common, kegg, uniprot
 from unikegg.dataset import sha256
 from unikegg.kegg_data import check_payload
+from unikegg.organisms import DEFAULT_CODES
 from unikegg.transforms import entities, relations
 
 
@@ -49,7 +50,7 @@ def test_uniprot_entry_points_share_plan(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["uniprot", "--dry-run"])
     uniprot.main()
     assert cli_plan == capsys.readouterr().out
-    assert cli_plan.count("GET ") == 10
+    assert cli_plan.count("GET ") == len(DEFAULT_CODES)
     assert "9606_hsa.tsv.gz" in cli_plan
     network.assert_not_called()
     assert not list(tmp_path.iterdir())

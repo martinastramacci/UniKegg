@@ -133,7 +133,7 @@ def test_cli_extended_dry_run_no_files(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(kegg, "ROOT", tmp_path / "absent")
     cli.main(["download-kegg", "--all-organisms", "--dry-run"])
     text = capsys.readouterr().out
-    assert "16 organisms, 86 base requests" in text
+    assert "16 organisms, 88 base requests" in text
     assert "/list/spo" in text
     assert not list(tmp_path.iterdir())
     cli.main(["list-organisms", "--search", "pombe"])

@@ -57,7 +57,16 @@ def initialize():
                 raise RuntimeError("Refusing to touch a nonempty integration-test schema")
             for path in sorted((ROOT / "db/init").glob("*.sql")):
                 for sql in statements(path):
-                    cursor.execute(sql)
+                    # Upgrade the old domain schema; Compose tests fresh DDL.
+                    if not re.search(r"CREATE TABLE ORTOLOGIA_(PATHWAY|EC)\b", sql):
+                        cursor.execute(sql)
+            migration = ROOT / "db/migrations/004_orthology_links.sql"
+            for sql in statements(migration):
+                cursor.execute(sql)
+            # Reapplication emits expected 'already exists' notes.
+            connection.raise_on_warnings = False
+            for sql in statements(migration):
+                cursor.execute(sql)
         finally:
             cursor.close()
     finally:
@@ -115,6 +124,40 @@ def duplicate_warning_connection(connect, directory, protein):
     return Connection()
 
 
+def check_orthology_constraints():
+    connection = loader.connect()
+    cursor = connection.cursor()
+    try:
+        for statement, errno in [
+            ("INSERT INTO ORTOLOGIA_PATHWAY VALUES ('K99999','map00010')", 1452),
+            ("INSERT INTO ORTOLOGIA_PATHWAY VALUES ('K00001','map99999')", 1452),
+            ("INSERT INTO ORTOLOGIA_EC VALUES ('K99999','1.1.1.1')", 1452),
+            ("INSERT INTO ORTOLOGIA_EC VALUES ('K00001','9.9.9.9')", 1452),
+            ("INSERT INTO ORTOLOGIA_PATHWAY VALUES ('K00001','map00010')", 1062),
+            ("INSERT INTO ORTOLOGIA_EC VALUES ('K00001','1.1.1.1')", 1062),
+        ]:
+            error = expect_error(lambda: cursor.execute(statement), mysql.connector.Error)
+            assert error.errno == errno, error
+        cursor.execute("INSERT INTO ORTOLOGIA_KEGG VALUES ('K99998', NULL, NULL)")
+        cursor.execute("INSERT INTO ORTOLOGIA_PATHWAY VALUES ('K99998','map00010')")
+        error = expect_error(
+            lambda: cursor.execute("DELETE FROM ORTOLOGIA_KEGG WHERE ko_id='K99998'"),
+            mysql.connector.Error,
+        )
+        assert error.errno == 1451
+        cursor.execute("DELETE FROM ORTOLOGIA_PATHWAY WHERE ko_id='K99998'")
+        cursor.execute("INSERT INTO ORTOLOGIA_EC VALUES ('K99998','1.1.1.1')")
+        error = expect_error(
+            lambda: cursor.execute("UPDATE ORTOLOGIA_KEGG SET ko_id='K99997' WHERE ko_id='K99998'"),
+            mysql.connector.Error,
+        )
+        assert error.errno == 1451
+    finally:
+        connection.rollback()
+        cursor.close()
+        connection.close()
+
+
 def run():
     database = os.environ.get("UNIKEGG_MYSQL_TEST_DATABASE")
     if database != "UniKeggRegression":
@@ -156,6 +199,7 @@ def run():
         assert sorted(result["action"] for result in results) == ["loaded", "verified"]
         assert loader.run(verify_only=True)["action"] == "verified"
         assert loader.run()["action"] == "verified"
+        check_orthology_constraints()
         for table in TABLES:
             columns = ",".join(f"`{c}`" for c in table["columns"])
             actual = query(f"SELECT {columns} FROM `{table['name']}`")

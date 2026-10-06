@@ -1,6 +1,8 @@
 # Aggiornare il database e consultare le versioni
 
-`unikegg update` sincronizza il database esistente con i venti TSV e il manifest in `data/processed/` (oppure `UNIKEGG_PROCESSED_DIR`). Aggiunge i record nuovi, modifica quelli cambiati e rimuove quelli assenti dal nuovo dataset, comprese le relazioni. Non ricrea il database, le tabelle biologiche o il volume MySQL.
+`unikegg update` sincronizza il database esistente con i ventidue TSV e il manifest in `data/processed/` (oppure `UNIKEGG_PROCESSED_DIR`). Aggiunge i record nuovi, modifica quelli cambiati e rimuove quelli assenti dal nuovo dataset, comprese le relazioni. Non ricrea il database, le tabelle biologiche o il volume MySQL.
+
+Per database precedenti all’estensione KO, applicare prima la [migrazione delle relazioni KO](orthology-migration.md) e rigenerare i 22 TSV. `update` non crea automaticamente le nuove tabelle biologiche.
 
 ## Comandi
 
@@ -27,7 +29,7 @@ Il primo caricamento di un database vuoto resta `unikegg load`, che registra la 
 
 ## Acquisire una nuova versione dalle fonti
 
-`update` applica un dataset locale completo e validato; il download rimane un passaggio esplicito. Per mantenere i dieci organismi predefiniti:
+`update` applica un dataset locale completo e validato; il download rimane un passaggio esplicito. Per mantenere i 16 organismi predefiniti:
 
 ```bash
 unikegg download-kegg --refresh

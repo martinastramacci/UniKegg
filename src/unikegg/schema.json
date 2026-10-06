@@ -584,5 +584,71 @@
       "reaction_id": "CHAR(6)",
       "ec_number": "VARCHAR(20)"
     }
+  },
+  {
+    "name": "ORTOLOGIA_PATHWAY",
+    "file": "ortologia_pathway.tsv",
+    "columns": [
+      "ko_id",
+      "map_id"
+    ],
+    "pk": [
+      "ko_id",
+      "map_id"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "ko_id",
+        "parent": "ORTOLOGIA_KEGG",
+        "target": "ko_id"
+      },
+      {
+        "column": "map_id",
+        "parent": "PATHWAY_RIFERIMENTO",
+        "target": "map_id"
+      }
+    ],
+    "specs": {
+      "ko_id": "CHAR(6) NOT NULL",
+      "map_id": "CHAR(8) NOT NULL"
+    },
+    "patterns": {
+      "ko_id": "K[0-9]{5}",
+      "map_id": "map[0-9]{5}"
+    }
+  },
+  {
+    "name": "ORTOLOGIA_EC",
+    "file": "ortologia_ec.tsv",
+    "columns": [
+      "ko_id",
+      "ec_number"
+    ],
+    "pk": [
+      "ko_id",
+      "ec_number"
+    ],
+    "nullable": [],
+    "fk": [
+      {
+        "column": "ko_id",
+        "parent": "ORTOLOGIA_KEGG",
+        "target": "ko_id"
+      },
+      {
+        "column": "ec_number",
+        "parent": "NUMERO_EC",
+        "target": "ec_number"
+      }
+    ],
+    "specs": {
+      "ko_id": "CHAR(6) NOT NULL",
+      "ec_number": "VARCHAR(20) NOT NULL"
+    },
+    "patterns": {
+      "ko_id": "K[0-9]{5}",
+      "ec_number": "[0-9]+\\.(?:[0-9]+|-)\\.(?:[0-9]+|-)\\.(?:[0-9]+|n[0-9]+|-)"
+    }
   }
 ]

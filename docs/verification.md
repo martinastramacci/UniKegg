@@ -1,5 +1,42 @@
 # Local verification record
 
+## Migration of the supplied legacy dump — 2026-10-05
+
+The supplied 20-table dump contained 2,006,370 rows, 10 organisms, 89,601
+proteins and 200,249 genes. An isolated native MySQL 8.4.11 restore was enriched
+with 49,064 KO/pathway links, 10,131 KO/EC links, 42 KO records and 1,249 EC
+records. One upstream K10658/2.3.2.27 link was quarantined after catalog absence
+and KEGG GET HTTP 404 verification; the raw assertion and evidence were retained.
+
+All original values were preserved, with SHA-256 comparisons of ordered rows.
+The exported 22-table, 2,066,856-row dump was restored into a second empty
+database; every table's values matched. All FK, sequence, species and isoform
+parent audits passed. Original files remained unchanged. The final package was
+copied beside the original dump and every packaged file checksum was verified.
+The complete test suite passed: 249 tests. No preexisting MySQL server was modified.
+The package does not claim a fresh UniProt release or independently reverified
+Swiss-Prot status. See [legacy migration](orthology-migration.md#dump-legacy-con-nomi-minuscoli).
+
+## Direct KO–Pathway and KO–EC relationships — 2026-10-05
+
+| Check | Result |
+|---|---|
+| Python 3.14.4 unit/regression suite | 245 passed |
+| Direct relation transformation | N:M mappings, map/ko normalization, deduplication, order independence and KO-only EC retention passed |
+| Invalid sources and bundles | Missing files, malformed identifiers, reversed columns, orphan references and duplicate keys rejected; prior bundle preserved |
+| MySQL 8.4.11 on an isolated temporary server | Additive migration from the old schema and repeated migration passed |
+| MySQL bridge integrity | Both FK endpoints and duplicate PK rejection passed; referenced KO deletion/update rejected |
+| MySQL ingestion and synchronization | 22-table round trips, KO parent changes, link additions/removals, concurrency and rollback passed |
+| Ruff, SQLFluff, ingestion projections and diff whitespace | Passed |
+
+Tests used invented records. The existing biological database was not migrated;
+no complete upstream snapshot was downloaded or regenerated. A live KEGG
+[K00001 pathway response](https://rest.kegg.jp/link/pathway/ko:K00001) confirmed
+the duplicate map/ko representations handled by normalization. Local SQL tests
+used native MySQL 8.4.11; the configured Docker MySQL 8.0.44 job was not run
+locally. Follow the [migration guide](orthology-migration.md) to populate an
+existing installation. Historical 20-table results below describe older snapshots.
+
 ## Dataset synchronization and version history — 2026-09-30
 
 | Check | Result |
@@ -18,7 +55,7 @@ Tests used synthetic records on a temporary native MySQL server. No existing bio
 
 ## Curated acquisition update — 2026-09-30
 
-Verified after adding a 16-organism curated catalog (ten defaults plus six additions):
+Verified after adding a 16-organism curated catalog:
 
 | Check | Result |
 |---|---|

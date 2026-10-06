@@ -10,7 +10,7 @@ from unikegg.config import ARTIFACTS, RAW
 from unikegg.config import PROCESSED as OUTPUT
 from unikegg.identifiers import EC_RE
 from unikegg.kegg_data import detail_records as leggi_record_flat_file
-from unikegg.kegg_data import tabular_rows
+from unikegg.kegg_data import orthology_links, tabular_rows
 from unikegg.organisms import DEFAULT_CODES, active_codes
 from unikegg.transforms.sorting import unique_rows
 
@@ -245,6 +245,10 @@ def main() -> None:
     costruisci_gene_proteina()
     costruisci_gene_ortologia()
     costruisci_gene_pathway()
+    scrivi_tsv(
+        "ortologia_pathway.tsv", ["ko_id", "map_id"], orthology_links(RAW_KEGG, "pathway")
+    )
+    scrivi_tsv("ortologia_ec.tsv", ["ko_id", "ec_number"], orthology_links(RAW_KEGG, "ec"))
     costruisci_relazione_semplice(
         "ko_reaction.tsv",
         "ortologia_reazione.tsv",
@@ -268,7 +272,7 @@ def main() -> None:
     )
     costruisci_reazione_ec()
     costruisci_proteina_go_ec()
-    print("[03_produci_relazioni] OK: tutte le 9 relazioni sono state prodotte.")
+    print("[03_produci_relazioni] OK: tutte le 11 relazioni sono state prodotte.")
 
 
 if __name__ == "__main__":

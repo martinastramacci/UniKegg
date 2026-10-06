@@ -38,3 +38,6 @@ dist/
 htmlcov/
 .DS_Store
 Thumbs.db
+
+# Ignored Italian documentation
+docs/guida-comandi.md

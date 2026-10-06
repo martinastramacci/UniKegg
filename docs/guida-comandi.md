@@ -4,6 +4,8 @@ Questa guida accompagna dall'installazione al database interrogabile, con esempi
 
 I blocchi dei diversi percorsi sono **alternative**: scegliere quello adatto al proprio punto di partenza. Eseguire ogni passaggio successivo solo se il precedente termina senza errori.
 
+Per aggiornare uno snapshot o un database precedente a 20 tabelle, seguire prima la [migrazione KO, download e rigenerazione dei TSV](orthology-migration.md). Il contratto attuale richiede anche `ortologia_pathway.tsv` e `ortologia_ec.tsv`.
+
 ## Indice
 
 1. [Scegliere il percorso](#1-scegliere-il-percorso)
@@ -25,7 +27,7 @@ I blocchi dei diversi percorsi sono **alternative**: scegliere quello adatto al 
 |---|---|
 | Voglio costruire il dataset completo dei 16 organismi | Installazione, poi sezione 3 |
 | Mi servono soltanto i file reviewed UniProt | Installazione Python, poi sezione 4; MySQL e KEGG non servono |
-| Ho già i venti TSV elaborati e il loro `manifest.json` | Sezione 5 |
+| Ho già i ventidue TSV elaborati e il loro `manifest.json` | Sezione 5 |
 | Ho già un database caricato e voglio aggiornarlo | Sezione 6 |
 | Voglio provare il funzionamento senza scaricare dati biologici | Sezione 11 |
 | Voglio sapere cosa fa un comando o un'opzione | Sezioni 7 e 8 |
@@ -47,7 +49,7 @@ download-uniprot + download-kegg
 
 UniProt fornisce le proteine **reviewed / Swiss-Prot**; KEGG fornisce geni e altre entità/relazioni. Il solo download UniProt produce file utilizzabili separatamente, ma la trasformazione del dataset integrato richiede entrambe le fonti.
 
-Senza opzioni, i download selezionano i **primi dieci organismi**. Per tutti i sedici specificare sempre `--all-organisms`. Il clone pubblico non contiene i dati biologici: la presenza del codice non implica la presenza dei TSV.
+Senza opzioni, i download selezionano **tutti i 16 organismi**. Il clone pubblico non contiene i dati biologici: la presenza del codice non implica la presenza dei TSV.
 
 ## 2. Installare e configurare
 
@@ -179,12 +181,12 @@ unikegg transform
 unikegg validate
 ```
 
-`transform` legge la selezione KEGG completata e richiede che UniProt copra tutti gli organismi selezionati. Produce i **venti TSV** delle tabelle biologiche e `manifest.json` nella directory processed. Valida i dati prima di pubblicarli e stampa l'evento `transformed` alla conclusione.
+`transform` legge la selezione KEGG completata e richiede che UniProt copra tutti gli organismi selezionati. Produce i **ventidue TSV** delle tabelle biologiche e `manifest.json` nella directory processed. Valida i dati prima di pubblicarli e stampa l'evento `transformed` alla conclusione.
 
 `validate` ricontrolla il bundle elaborato senza accedere a MySQL. Il successo include un messaggio simile a:
 
 ```json
-{"event": "dataset_validated", "tables": 20, "kind": "swissprot"}
+{"event": "dataset_validated", "tables": 22, "kind": "swissprot"}
 ```
 
 Se uno dei due comandi fallisce, risolvere l'errore prima del caricamento.
@@ -307,7 +309,7 @@ Il nuovo bundle processed contiene solo il sottoinsieme richiesto e sostituisce 
 
 ## 5. Caricare un dataset già pronto
 
-Se si dispone già dei venti TSV e del relativo `manifest.json`, non servono i download né `transform`.
+Se si dispone già dei ventidue TSV e del relativo `manifest.json`, non servono i download né `transform`.
 
 1. Collocare il bundle completo in `data/processed/` oppure impostare `UNIKEGG_PROCESSED_DIR` sulla sua directory.
 2. Impostare `UNIKEGG_DATASET_KIND=swissprot` per un dataset reale.
@@ -423,7 +425,7 @@ unikegg transform --reviewed-export /percorso/export-uniprot
 
 L'ultimo percorso è un esempio da sostituire con una directory reale. `--reviewed-export` seleziona una **directory**, non un singolo `.tsv.gz`. La sorgente KEGG resta quella della directory dati configurata.
 
-Senza selezione esplicita usa il manifest KEGG completato; per export legacy senza selezione registrata usa i dieci organismi predefiniti. Il report delle associazioni gene/proteina viene scritto nella directory artifacts come `report_gene_proteina.tsv`.
+Senza selezione esplicita usa il manifest KEGG completato; per export legacy senza selezione registrata usa tutti i 16 organismi predefiniti. Il report delle associazioni gene/proteina viene scritto nella directory artifacts come `report_gene_proteina.tsv`.
 
 ### 7.5 `validate`
 
@@ -441,7 +443,7 @@ Con le variabili MySQL locali configurate come nella sezione 9.2:
 unikegg load --version-label "Prima versione"
 ```
 
-In alternativa usare `docker compose run --rm etl load --version-label "Prima versione"`. Richiede lo schema inizializzato; non crea autonomamente il database o le venti tabelle biologiche. Il primo caricamento richiede tabelle vuote. Lo stesso fingerprint già caricato viene verificato, un fingerprint differente viene rifiutato con l'indicazione di usare `update`.
+In alternativa usare `docker compose run --rm etl load --version-label "Prima versione"`. Richiede lo schema inizializzato; non crea autonomamente il database o le ventidue tabelle biologiche. Il primo caricamento richiede tabelle vuote. Lo stesso fingerprint già caricato viene verificato, un fingerprint differente viene rifiutato con l'indicazione di usare `update`.
 
 ### 7.7 `update`
 
@@ -470,7 +472,7 @@ Restituisce JSON con `current_version` e l'elenco `versions`: versione, data `ap
 
 ### 7.10 `manifest`
 
-Da usare quando i venti TSV esistono già e si possiede l'export reviewed di riferimento:
+Da usare quando i ventidue TSV esistono già e si possiede l'export reviewed di riferimento:
 
 ```bash
 unikegg manifest --reviewed-export data/raw/uniprot
@@ -515,7 +517,7 @@ Le opzioni non supportate da un comando vengono rifiutate. Per esempio, `unikegg
 |---|---|---|
 | `UNIKEGG_HOME` | Directory corrente | Radice del progetto, contenente anche `db/` |
 | `UNIKEGG_DATA_DIR` | `UNIKEGG_HOME/data` | Radice delle sorgenti `raw/` e, se non ridefinita, di `processed/` |
-| `UNIKEGG_PROCESSED_DIR` | `UNIKEGG_DATA_DIR/processed` | Directory dei venti TSV e del manifest |
+| `UNIKEGG_PROCESSED_DIR` | `UNIKEGG_DATA_DIR/processed` | Directory dei ventidue TSV e del manifest |
 | `UNIKEGG_REVIEWED_DIR` | `UNIKEGG_DATA_DIR/raw/uniprot` | Export letti da trasformazione/manifest; non cambia la destinazione del downloader |
 | `UNIKEGG_ARTIFACTS_DIR` | `UNIKEGG_HOME/artifacts` | Report generati dalla trasformazione |
 | `UNIKEGG_DATASET_KIND` | `swissprot` | Tipo atteso da validazione e operazioni sul DB; `synthetic` solo per le fixture |
@@ -541,7 +543,7 @@ raw/
     manifest.jsonl
 processed/
   manifest.json
-  ... venti file TSV ...
+  ... ventidue file TSV ...
 ```
 
 `selection.json` descrive la selezione e il suo completamento; `manifest.jsonl` conserva la provenienza degli export; il `manifest.json` processed identifica il bundle da caricare. Pagine e batch raw restano disponibili per la ripresa e occupano spazio oltre ai file finali.
@@ -648,7 +650,7 @@ exit
 
 ### 11.1 Demo senza acquisizione biologica
 
-Le fixture contengono record inventati per tutte le venti tabelle e dieci organismi. Usare una sessione dedicata e un progetto Compose distinto da quello dei dati reali:
+Le fixture contengono record inventati per tutte le ventidue tabelle e 16 organismi. Usare una sessione dedicata e un progetto Compose distinto da quello dei dati reali:
 
 ```bash
 python tests/make_fixture.py
@@ -748,7 +750,7 @@ In questo secondo esempio vengono aggiornati anche gli organismi precedentemente
 | HTTP `400` o `404` | Sono errori permanenti per il client; controllare richiesta/configurazione invece di ripetere senza modifiche |
 | `Acquisition already running` | Attendere la fine del downloader/trasformatore che usa quella sorgente; il file del lock può esistere anche quando il lock non è attivo |
 | `Transformation lock exists` | Verificare che non ci sia un writer attivo e seguire il recupero descritto in [operations.md](operations.md), ispezionando eventuali backup prima di rimuovere un lock residuo |
-| `Output directory contains unrelated files` | Scegliere una destinazione processed dedicata ai venti TSV e al manifest |
+| `Output directory contains unrelated files` | Scegliere una destinazione processed dedicata ai ventidue TSV e al manifest |
 | `Checksum mismatch`, chiavi duplicate o riferimenti mancanti | Controllare la coerenza dello snapshot e rigenerare dal raw corretto; rigenerare solo il manifest non corregge i dati |
 | File processed o manifest non trovati | Verificare `UNIKEGG_PROCESSED_DIR`; eseguire `transform` o fornire il bundle completo |
 | `KeyError: MYSQL_PASSWORD` nella CLI locale | Esportare la password come nella sezione 9.2; `.env` non viene caricato dalla CLI |

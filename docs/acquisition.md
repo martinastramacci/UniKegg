@@ -2,7 +2,7 @@
 
 Per il percorso completo dall'installazione al database, con il riferimento di tutti i comandi, vedere la [guida pratica passo per passo](guida-comandi.md).
 
-UniKegg supporta un catalogo curato di **16 organismi**, con proteine UniProtKB/Swiss-Prot (`reviewed:true`). I dieci organismi originali restano il default. `--all-organisms` seleziona tutti i 16 organismi del catalogo, non l'intero catalogo KEGG. Gli ID locali dei dieci organismi originali rimangono invariati.
+UniKegg supporta un catalogo curato di **16 organismi**, con proteine UniProtKB/Swiss-Prot (`reviewed:true`). Tutti i 16 organismi sono il default. `--all-organisms` seleziona tutti i 16 organismi del catalogo, non l'intero catalogo KEGG. Gli ID locali dei dieci organismi originali rimangono invariati.
 
 ## Organismi disponibili
 
@@ -37,15 +37,11 @@ Dalla directory del progetto, dopo l'installazione del pacchetto:
 unikegg list-organisms
 unikegg list-organisms --search pombe
 
-# I dieci organismi originali:
+# Tutti i 16 organismi del catalogo curato (comportamento predefinito):
 unikegg download-kegg
 unikegg download-uniprot
 unikegg transform
 
-# Tutti i 16 organismi del catalogo curato:
-unikegg download-kegg --all-organisms
-unikegg download-uniprot --all-organisms
-unikegg transform
 unikegg validate
 
 # Una lista precisa:
@@ -58,7 +54,7 @@ unikegg download-kegg --limit 12 --dry-run
 unikegg download-uniprot --limit 12 --dry-run
 ```
 
-Le modalità `--organisms`, `--limit` e `--all-organisms` sono alternative. `--limit` accetta un intero da 1 a 16, senza ridurre silenziosamente un numero maggiore. Codici sconosciuti, vuoti o ripetuti sono rifiutati prima di scaricare. Il dry-run non accede alla rete e non crea file. Per KEGG mostra il numero esatto di richieste di base (56 per dieci organismi, 86 per sedici); i batch aggiuntivi dipendono dalle relazioni scaricate. UniProt mostra le query delle pagine; il numero complessivo di pagine è noto solo dopo la prima risposta di ciascuna query.
+Le modalità `--organisms`, `--limit` e `--all-organisms` sono alternative. `--limit` accetta un intero da 1 a 16, senza ridurre silenziosamente un numero maggiore. Codici sconosciuti, vuoti o ripetuti sono rifiutati prima di scaricare. Il dry-run non accede alla rete e non crea file. Per KEGG mostra il numero esatto di richieste di base (86 per tutti i 16 organismi); i batch aggiuntivi dipendono dalle relazioni scaricate. UniProt mostra le query delle pagine; il numero complessivo di pagine è noto solo dopo la prima risposta di ciascuna query.
 
 `transform` legge la selezione completata di KEGG e richiede che UniProt la copra. Per trasformare solo una parte di fonti già scaricate:
 
@@ -89,7 +85,7 @@ unikegg download-uniprot --all-organisms --batch-size 4 --batch 2
 unikegg download-uniprot --all-organisms --batch-size 4 --dry-run
 ```
 
-`--batch-size` accetta da 1 a 16 organismi; `--batch` richiede `--batch-size` ed è numerato da 1. I blocchi seguono l'ordine del catalogo e si applicano alla selezione indicata (`--all-organisms`, `--organisms` o `--limit`); senza selezione esplicita si usano i dieci organismi predefiniti. L'ultimo blocco può contenere meno organismi. Senza `--batch` il comando esegue tutti i blocchi in sequenza. Il raggruppamento riguarda gli organismi; la paginazione HTTP resta di massimo 500 proteine per pagina.
+`--batch-size` accetta da 1 a 16 organismi; `--batch` richiede `--batch-size` ed è numerato da 1. I blocchi seguono l'ordine del catalogo e si applicano alla selezione indicata (`--all-organisms`, `--organisms` o `--limit`); senza selezione esplicita si usano tutti i 16 organismi predefiniti. L'ultimo blocco può contenere meno organismi. Senza `--batch` il comando esegue tutti i blocchi in sequenza. Il raggruppamento riguarda gli organismi; la paginazione HTTP resta di massimo 500 proteine per pagina.
 
 Per costruire progressivamente una selezione in più sessioni usare **`--append`**:
 
@@ -157,3 +153,7 @@ I test offline verificano selezioni di 1/2/16 organismi, pipeline ripetuta, risp
 I test dei blocchi UniProt coprono inoltre tutti i 16 organismi in una singola esecuzione o in sessioni cumulative, blocchi incompleti nell'ultima posizione, gruppi manuali, JSON facoltativo, opzioni non valide, dry-run senza modifiche, ripresa delle aggiunte interrotte e aggiornamento delle release nei gruppi precedenti. Queste verifiche usano risposte HTTP simulate e non scaricano dati biologici.
 
 Fonti: [KEGG API e limite delle richieste](https://www.kegg.jp/kegg/rest/), [manuale KEGG](https://www.kegg.jp/kegg/rest/keggapi.html), [API UniProt, paginazione e stream](https://academic.oup.com/nar/article/53/W1/W547/8126256).
+
+## Collegamenti diretti KO, pathway ed EC
+
+`download-kegg` acquisisce anche `/link/pathway/ko` e `/link/enzyme/ko`, salvando `relations/ko_pathway.tsv` e `relations/ko_ec.tsv`. Sono relazioni globali, come i cataloghi KO e reference pathway, indipendenti dalla selezione degli organismi. La cache verificata, i checksum e i tentativi HTTP si applicano anche a questi file. `transform` richiede entrambi i raw, normalizza gli identificatori e produce `ortologia_pathway.tsv` e `ortologia_ec.tsv`; un raw mancante o incoerente blocca la pubblicazione. Per snapshot precedenti, seguire la [procedura di migrazione](orthology-migration.md).

@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from unikegg.dataset import CODES, sha256
+from unikegg.identifiers import EC_RE
 from unikegg.organisms import BY_CODE, recorded_selection
 
 
@@ -98,6 +99,8 @@ def requests(codes=CODES):
         ("/list/genome", "organism/organism_list.tsv"),
         ("/list/ko", "ko/ko_list.tsv"),
         ("/list/pathway", "pathway/pathway_reference.tsv"),
+        ("/link/pathway/ko", "relations/ko_pathway.tsv"),
+        ("/link/enzyme/ko", "relations/ko_ec.tsv"),
         ("/link/reaction/ko", "relations/ko_reaction.tsv"),
         ("/link/reaction/pathway", "relations/pathway_reaction.tsv"),
         ("/link/compound/reaction", "relations/reaction_compound.tsv"),
@@ -160,6 +163,40 @@ def pairs(root, relative):
         yield tuple(strip_prefix(value) for value in fields)
 
 
+def orthology_links(root, kind):
+    """Read direct KO assertions, validating catalogs and canonical reference IDs.
+
+    KEGG link/<target>/ko returns KO first. mapNNNNN and koNNNNN are
+    representations of the same reference pathway; species maps are not accepted.
+    Missing parents indicate inconsistent exports and must not be silently lost.
+    """
+    if kind not in {"pathway", "ec"}:
+        raise ValueError(f"Unknown orthology relationship: {kind}")
+    root = Path(root)
+    kos = {strip_prefix(row[0]) for row in tabular_rows(root / "ko/ko_list.tsv")}
+    maps = (
+        {strip_prefix(row[0]) for row in tabular_rows(root / "pathway/pathway_reference.tsv")}
+        if kind == "pathway" else set()
+    )
+    path = root / f"relations/ko_{kind}.tsv"
+    for number, (left, right) in enumerate(tabular_rows(path), 1):
+        if not re.fullmatch(r"(?:ko:)?K[0-9]{5}", left):
+            raise ValueError(f"Invalid KEGG KO identifier: {path}:{number}: {left}")
+        ko = strip_prefix(left)
+        if kind == "pathway":
+            match = re.fullmatch(r"(?:path:)?(?:map|ko)([0-9]{5})", right)
+            if not match:
+                raise ValueError(f"Invalid KEGG reference pathway: {path}:{number}: {right}")
+            target = "map" + match[1]
+        else:
+            target = right.removeprefix("ec:")
+            if not EC_RE.fullmatch(target):
+                raise ValueError(f"Invalid KEGG EC identifier: {path}:{number}: {right}")
+        if ko not in kos or (kind == "pathway" and target not in maps):
+            raise ValueError(f"Unresolved KEGG source relationship: {path}:{number}: {ko}, {target}")
+        yield ko, target
+
+
 def linked(root, relative, selected, prefix):
     result = set()
     for left, right in pairs(root, relative):
@@ -203,6 +240,9 @@ def preflight(root, codes=CODES):
 
     kos = {strip_prefix(row[0]) for row in tabular_rows(root / "ko/ko_list.tsv")}
     maps = {strip_prefix(row[0]) for row in tabular_rows(root / "pathway/pathway_reference.tsv")}
+    for kind in ("pathway", "ec"):
+        for _ in orthology_links(root, kind):
+            pass
     for code in sorted(codes):
         gene_file = root / f"genes/{code}_genes.tsv"
         genes = [row[0] for row in tabular_rows(gene_file, columns=4, allow_empty=False)]

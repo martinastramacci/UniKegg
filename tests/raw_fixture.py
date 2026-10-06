@@ -81,6 +81,8 @@ def generate(home):
     raw_tsv(kegg / "organism/organism_list.tsv", organisms)
     raw_tsv(kegg / "ko/ko_list.tsv", [["K00001", 'Synthetic "orthology"; synthetic definition']])
     raw_tsv(kegg / "pathway/pathway_reference.tsv", [["map00010", "Synthetic pathway"]])
+    raw_tsv(kegg / "relations/ko_pathway.tsv", [["ko:K00001", "path:ko00010"]])
+    raw_tsv(kegg / "relations/ko_ec.tsv", [["ko:K00001", "ec:1.1.1.1"]])
     raw_tsv(kegg / "relations/ko_reaction.tsv", [["ko:K00001", "rn:R00001"]])
     raw_tsv(kegg / "relations/pathway_reaction.tsv", [["path:map00010", "rn:R00001"]])
     raw_tsv(kegg / "relations/reaction_compound.tsv", [["rn:R00001", "cpd:C00001"]])

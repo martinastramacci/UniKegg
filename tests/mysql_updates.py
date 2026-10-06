@@ -67,6 +67,13 @@ def run(directory, original):
     proteins[0]["protein_name"] = "UPDATED protein 🧬"
     # A change invisible to MySQL's accent/case-insensitive text equality.
     data["GENE_KEGG"][0]["definition"] = "SYNTHETIC GENE"
+    # Change a KO parent (dependent bridges must be removed/reinserted),
+    # replace a direct EC assertion and add a pathway assertion.
+    data["ORTOLOGIA_KEGG"][0]["definition"] = "Updated KO definition"
+    data["PATHWAY_RIFERIMENTO"].append({"map_id": "map00020", "name": "New map"})
+    data["ORTOLOGIA_PATHWAY"].append({"ko_id": "K00001", "map_id": "map00020"})
+    data["NUMERO_EC"].append({"ec_number": "2.7.1.999"})
+    data["ORTOLOGIA_EC"] = [{"ko_id": "K00001", "ec_number": "2.7.1.999"}]
     removed_protein = proteins[-1]["accession"]
     removed_gene = data["GENE_KEGG"][-1]["kegg_gene_id"]
     for table in TABLES:
@@ -96,6 +103,8 @@ def run(directory, original):
     assert plan["action"] == "planned"
     assert plan["changes"]["PROTEIN_UNIPROT"] == {"added": 1, "removed": 1, "modified": 2}
     assert plan["changes"]["GENE_KEGG"] == {"added": 1, "removed": 1, "modified": 1}
+    assert plan["changes"]["ORTOLOGIA_PATHWAY"] == {"added": 1, "removed": 0, "modified": 0}
+    assert plan["changes"]["ORTOLOGIA_EC"] == {"added": 1, "removed": 1, "modified": 0}
     assert database() == before
     assert query("SELECT * FROM ETL_LOAD_STATE") == old_state
     assert len(versions.run()["versions"]) == 1

@@ -1,5 +1,5 @@
 -- MySQL 8.0 schema; the database is selected by the container initializer.
-CREATE TABLE ORGANISMO (
+CREATE TABLE ORGANISM (
     organism_id INT UNSIGNED PRIMARY KEY,
     kegg_code VARCHAR(5) NOT NULL UNIQUE,
     taxonomy_id INT UNSIGNED NOT NULL UNIQUE,
@@ -15,7 +15,7 @@ CREATE TABLE GENE_KEGG (
     symbol VARCHAR(255),
     definition TEXT,
 
-    FOREIGN KEY (organism_id) REFERENCES ORGANISMO (organism_id)
+    FOREIGN KEY (organism_id) REFERENCES ORGANISM (organism_id)
 );
 
 CREATE TABLE PROTEIN_UNIPROT (
@@ -30,39 +30,39 @@ CREATE TABLE PROTEIN_UNIPROT (
 
     amino_acid_sequence MEDIUMTEXT NOT NULL,
     KEY (organism_id),
-    FOREIGN KEY (organism_id) REFERENCES ORGANISMO (organism_id),
+    FOREIGN KEY (organism_id) REFERENCES ORGANISM (organism_id),
     CHECK (sequence_length > 0 AND molecular_mass > 0)
 
 );
 
-CREATE TABLE ORTOLOGIA_KEGG (
+CREATE TABLE ORTHOLOGY_KEGG (
     ko_id CHAR(6) PRIMARY KEY,
     name VARCHAR(300),
     definition TEXT
 );
 
-CREATE TABLE PATHWAY_RIFERIMENTO (
+CREATE TABLE PATHWAY_REFERENCE (
     map_id CHAR(8) PRIMARY KEY,
     name VARCHAR(500) NOT NULL
 );
 
-CREATE TABLE PATHWAY_ORGANISMO (
+CREATE TABLE PATHWAY_ORGANISM (
     pathway_id VARCHAR(12) PRIMARY KEY,
     organism_id INT UNSIGNED NOT NULL,
     map_id CHAR(8) NOT NULL,
     UNIQUE (organism_id, map_id),
-    FOREIGN KEY (organism_id) REFERENCES ORGANISMO (organism_id),
-    FOREIGN KEY (map_id) REFERENCES PATHWAY_RIFERIMENTO (map_id)
+    FOREIGN KEY (organism_id) REFERENCES ORGANISM (organism_id),
+    FOREIGN KEY (map_id) REFERENCES PATHWAY_REFERENCE (map_id)
 );
 
-CREATE TABLE REAZIONE_KEGG (
+CREATE TABLE REACTION_KEGG (
     reaction_id CHAR(6) PRIMARY KEY,
     name TEXT,
     definition TEXT,
     equation TEXT
 );
 
-CREATE TABLE COMPOSTO_KEGG (
+CREATE TABLE COMPOUND_KEGG (
     compound_id CHAR(6) PRIMARY KEY,
     name TEXT NOT NULL,
     formula VARCHAR(500),
@@ -70,13 +70,13 @@ CREATE TABLE COMPOSTO_KEGG (
     molecular_weight DECIMAL(24, 10)
 );
 
-CREATE TABLE TERMINE_GO (
+CREATE TABLE GO_TERM (
     go_id CHAR(10) PRIMARY KEY,
     name VARCHAR(500) NOT NULL,
     namespace ENUM('BP', 'MF', 'CC') NOT NULL
 );
 
-CREATE TABLE NUMERO_EC (
+CREATE TABLE EC_NUMBER (
     ec_number VARCHAR(20) PRIMARY KEY
 );
 
@@ -91,7 +91,7 @@ CREATE TABLE PROTEIN_ISOFORM (
     FOREIGN KEY (accession) REFERENCES PROTEIN_UNIPROT (accession) ON DELETE CASCADE
 );
 
-CREATE TABLE GENE_PROTEINA (
+CREATE TABLE GENE_PROTEIN (
     kegg_gene_id VARCHAR(40),
     accession VARCHAR(10),
     mapping_source ENUM('KEGG_CONV', 'UNIPROT_DR') NOT NULL,
@@ -101,13 +101,13 @@ CREATE TABLE GENE_PROTEINA (
     FOREIGN KEY (accession) REFERENCES PROTEIN_UNIPROT (accession) ON DELETE CASCADE
 );
 
-CREATE TABLE GENE_ORTOLOGIA (
+CREATE TABLE GENE_ORTHOLOGY (
     kegg_gene_id VARCHAR(40),
     ko_id CHAR(6),
     PRIMARY KEY (kegg_gene_id, ko_id),
     KEY (ko_id),
     FOREIGN KEY (kegg_gene_id) REFERENCES GENE_KEGG (kegg_gene_id) ON DELETE CASCADE,
-    FOREIGN KEY (ko_id) REFERENCES ORTOLOGIA_KEGG (ko_id)
+    FOREIGN KEY (ko_id) REFERENCES ORTHOLOGY_KEGG (ko_id)
 );
 
 CREATE TABLE GENE_PATHWAY (
@@ -115,78 +115,78 @@ CREATE TABLE GENE_PATHWAY (
     pathway_id VARCHAR(12),
     PRIMARY KEY (kegg_gene_id, pathway_id),
     FOREIGN KEY (kegg_gene_id) REFERENCES GENE_KEGG (kegg_gene_id) ON DELETE CASCADE,
-    FOREIGN KEY (pathway_id) REFERENCES PATHWAY_ORGANISMO (pathway_id)
+    FOREIGN KEY (pathway_id) REFERENCES PATHWAY_ORGANISM (pathway_id)
 );
 
-CREATE TABLE ORTOLOGIA_REAZIONE (
+CREATE TABLE ORTHOLOGY_REACTION (
     ko_id CHAR(6),
     reaction_id CHAR(6),
     PRIMARY KEY (ko_id, reaction_id),
-    FOREIGN KEY (ko_id) REFERENCES ORTOLOGIA_KEGG (ko_id),
-    FOREIGN KEY (reaction_id) REFERENCES REAZIONE_KEGG (reaction_id)
+    FOREIGN KEY (ko_id) REFERENCES ORTHOLOGY_KEGG (ko_id),
+    FOREIGN KEY (reaction_id) REFERENCES REACTION_KEGG (reaction_id)
 );
 
-CREATE TABLE PATHWAY_REAZIONE (
+CREATE TABLE PATHWAY_REACTION (
     map_id CHAR(8),
     reaction_id CHAR(6),
     PRIMARY KEY (map_id, reaction_id),
     KEY (reaction_id),
-    FOREIGN KEY (map_id) REFERENCES PATHWAY_RIFERIMENTO (map_id),
-    FOREIGN KEY (reaction_id) REFERENCES REAZIONE_KEGG (reaction_id)
+    FOREIGN KEY (map_id) REFERENCES PATHWAY_REFERENCE (map_id),
+    FOREIGN KEY (reaction_id) REFERENCES REACTION_KEGG (reaction_id)
 );
 
-CREATE TABLE REAZIONE_COMPOSTO (
+CREATE TABLE REACTION_COMPOUND (
     reaction_id CHAR(6),
     compound_id CHAR(6),
     PRIMARY KEY (reaction_id, compound_id),
-    FOREIGN KEY (reaction_id) REFERENCES REAZIONE_KEGG (reaction_id),
-    FOREIGN KEY (compound_id) REFERENCES COMPOSTO_KEGG (compound_id)
+    FOREIGN KEY (reaction_id) REFERENCES REACTION_KEGG (reaction_id),
+    FOREIGN KEY (compound_id) REFERENCES COMPOUND_KEGG (compound_id)
 );
 
-CREATE TABLE PROTEINA_GO (
+CREATE TABLE PROTEIN_GO (
     accession VARCHAR(10),
     go_id CHAR(10),
     evidence_code VARCHAR(12),
     evidence_source VARCHAR(100),
     PRIMARY KEY (accession, go_id),
     FOREIGN KEY (accession) REFERENCES PROTEIN_UNIPROT (accession) ON DELETE CASCADE,
-    FOREIGN KEY (go_id) REFERENCES TERMINE_GO (go_id)
+    FOREIGN KEY (go_id) REFERENCES GO_TERM (go_id)
 );
 
-CREATE TABLE PROTEINA_EC (
+CREATE TABLE PROTEIN_EC (
     accession VARCHAR(10),
     ec_number VARCHAR(20),
     PRIMARY KEY (accession, ec_number),
     FOREIGN KEY (accession) REFERENCES PROTEIN_UNIPROT (accession) ON DELETE CASCADE,
-    FOREIGN KEY (ec_number) REFERENCES NUMERO_EC (ec_number)
+    FOREIGN KEY (ec_number) REFERENCES EC_NUMBER (ec_number)
 );
 
-CREATE TABLE REAZIONE_EC (
+CREATE TABLE REACTION_EC (
     reaction_id CHAR(6),
     ec_number VARCHAR(20),
     PRIMARY KEY (reaction_id, ec_number),
-    FOREIGN KEY (reaction_id) REFERENCES REAZIONE_KEGG (reaction_id),
-    FOREIGN KEY (ec_number) REFERENCES NUMERO_EC (ec_number)
+    FOREIGN KEY (reaction_id) REFERENCES REACTION_KEGG (reaction_id),
+    FOREIGN KEY (ec_number) REFERENCES EC_NUMBER (ec_number)
 );
 
-CREATE TABLE ORTOLOGIA_PATHWAY (
+CREATE TABLE ORTHOLOGY_PATHWAY (
     ko_id CHAR(6) NOT NULL,
     map_id CHAR(8) NOT NULL,
     PRIMARY KEY (ko_id, map_id),
     KEY (map_id),
-    FOREIGN KEY (ko_id) REFERENCES ORTOLOGIA_KEGG (ko_id)
+    FOREIGN KEY (ko_id) REFERENCES ORTHOLOGY_KEGG (ko_id)
     ON DELETE RESTRICT ON UPDATE RESTRICT,
-    FOREIGN KEY (map_id) REFERENCES PATHWAY_RIFERIMENTO (map_id)
+    FOREIGN KEY (map_id) REFERENCES PATHWAY_REFERENCE (map_id)
     ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB;
 
-CREATE TABLE ORTOLOGIA_EC (
+CREATE TABLE ORTHOLOGY_EC (
     ko_id CHAR(6) NOT NULL,
     ec_number VARCHAR(20) NOT NULL,
     PRIMARY KEY (ko_id, ec_number),
     KEY (ec_number),
-    FOREIGN KEY (ko_id) REFERENCES ORTOLOGIA_KEGG (ko_id)
+    FOREIGN KEY (ko_id) REFERENCES ORTHOLOGY_KEGG (ko_id)
     ON DELETE RESTRICT ON UPDATE RESTRICT,
-    FOREIGN KEY (ec_number) REFERENCES NUMERO_EC (ec_number)
+    FOREIGN KEY (ec_number) REFERENCES EC_NUMBER (ec_number)
     ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB;

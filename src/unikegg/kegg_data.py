@@ -3,6 +3,7 @@
 import io
 import json
 import re
+import warnings
 from pathlib import Path
 
 from unikegg.dataset import CODES, sha256
@@ -168,7 +169,8 @@ def orthology_links(root, kind):
 
     KEGG link/<target>/ko returns KO first. mapNNNNN and koNNNNN are
     representations of the same reference pathway; species maps are not accepted.
-    Missing parents indicate inconsistent exports and must not be silently lost.
+    Missing parents indicate inconsistent exports. EC links to absent KOs may
+    be quarantined only with independent KEGG GET/404 evidence.
     """
     if kind not in {"pathway", "ec"}:
         raise ValueError(f"Unknown orthology relationship: {kind}")
@@ -179,6 +181,8 @@ def orthology_links(root, kind):
         if kind == "pathway" else set()
     )
     path = root / f"relations/ko_{kind}.tsv"
+    evidence_path = root / "missing_ko_checks.json"
+    evidence = json.loads(evidence_path.read_text()) if evidence_path.exists() else {}
     for number, (left, right) in enumerate(tabular_rows(path), 1):
         if not re.fullmatch(r"(?:ko:)?K[0-9]{5}", left):
             raise ValueError(f"Invalid KEGG KO identifier: {path}:{number}: {left}")
@@ -193,7 +197,23 @@ def orthology_links(root, kind):
             if not EC_RE.fullmatch(target):
                 raise ValueError(f"Invalid KEGG EC identifier: {path}:{number}: {right}")
         if ko not in kos or (kind == "pathway" and target not in maps):
-            raise ValueError(f"Unresolved KEGG source relationship: {path}:{number}: {ko}, {target}")
+            check = evidence.get(ko, {})
+            if (
+                kind == "ec" and ko not in kos
+                and check.get("status") == 404
+                and check.get("url") == f"https://rest.kegg.jp/get/{ko}"
+            ):
+                warnings.warn(
+                    f"Quarantined KEGG KO/EC relationship: {path}:{number}: {ko}, {target}; "
+                    "KO absent from catalog and independently verified HTTP 404",
+                    stacklevel=2,
+                )
+                continue
+            raise ValueError(
+                f"Unresolved KEGG source relationship: {path}:{number}: {ko}, {target}. "
+                "Run unikegg download-kegg with the same organism selection to reconcile "
+                "the KO catalog and verify missing KO/EC entries."
+            )
         yield ko, target
 
 
@@ -240,6 +260,10 @@ def preflight(root, codes=CODES):
 
     kos = {strip_prefix(row[0]) for row in tabular_rows(root / "ko/ko_list.tsv")}
     maps = {strip_prefix(row[0]) for row in tabular_rows(root / "pathway/pathway_reference.tsv")}
+    gene_evidence_path = root / "missing_gene_checks.json"
+    gene_evidence = (
+        json.loads(gene_evidence_path.read_text()) if gene_evidence_path.exists() else {}
+    )
     for kind in ("pathway", "ec"):
         for _ in orthology_links(root, kind):
             pass
@@ -264,8 +288,27 @@ def preflight(root, codes=CODES):
                 if gene not in genes or (
                     valid_targets is not None and strip_prefix(target) not in valid_targets
                 ):
+                    check = gene_evidence.get(gene, {})
+                    if (
+                        suffix == "gene_pathway" and gene not in genes
+                        and gene.startswith(code + ":")
+                        and strip_prefix(target) in valid_targets
+                        and check.get("status") == 404
+                        and check.get("url") == f"https://rest.kegg.jp/get/{gene}"
+                    ):
+                        warnings.warn(
+                            f"Quarantined KEGG gene/pathway relationship: {path}: "
+                            f"{gene}, {target}; gene absent from catalog and "
+                            "independently verified HTTP 404",
+                            stacklevel=2,
+                        )
+                        continue
                     raise ValueError(
-                        f"Unresolved KEGG source relationship: {path}: {gene}, {target}"
+                        f"Unresolved KEGG source relationship: {path}: {gene}, {target}; "
+                        + ("gene absent from catalog" if gene not in genes
+                           else "target absent from catalog")
+                        + ". Run unikegg download-kegg with the same organism selection "
+                        "to refresh inconsistent catalogs and relationships."
                     )
 
     selected = selected_details(root, codes)

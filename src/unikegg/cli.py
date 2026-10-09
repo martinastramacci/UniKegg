@@ -112,7 +112,7 @@ def main(argv=None):
         from unikegg.acquire.reviewed import reviewed_rows
         from unikegg.dataset import BY_NAME, manifest, rows, validate
 
-        actual = select([row["kegg_code"] for row in rows(PROCESSED, BY_NAME["ORGANISMO"])])
+        actual = select([row["kegg_code"] for row in rows(PROCESSED, BY_NAME["ORGANISM"])])
         if codes is not None and codes != actual:
             parser.error("Selected organisms do not match the processed tables")
         with selection(actual):

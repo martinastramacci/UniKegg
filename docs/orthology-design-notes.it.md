@@ -11,7 +11,7 @@ Ecco un'analisi estesa e dettagliata da inserire nel prompt o nella documentazio
 
 Per capire perché il collegamento è obbligatorio, bisogna analizzare come KEGG struttura l'informazione biologica:
 
-*   **I Reference Pathways (Mappe di Riferimento):** Sono reti metaboliche o di segnalazione generiche, non legate a un organismo specifico. I nodi di queste reti (i "rettangolini" che si vedono nelle mappe KEGG sul sito, come ad esempio la mappa `map00010` per la Glicolisi) **NON** rappresentano geni di una specie particolare.
+*   **I Reference Pathways (Mappe di Riferimento):** Sono reti metaboliche o di segnalazione generiche, non legate a un organism specifico. I nodi di queste reti (i "rettangolini" che si vedono nelle mappe KEGG sul sito, come ad esempio la mappa `map00010` per la Glicolisi) **NON** rappresentano geni di una specie particolare.
 *   **KEGG Orthology (KO):** È il sistema di classificazione funzionale di KEGG. Un gruppo ortologo (identificato da un codice KO, es. `K00010`) raggruppa geni di specie diverse che svolgono la stessa funzione biochimica e discendono da un antenato comune.
 
 **Il punto cruciale è questo:** i nodi all'interno dei Reference Pathway sono costituiti *esattamente* dalle KEGG Orthology. Le KO sono i "mattoni" funzionali con cui vengono costruite le mappe di riferimento.
@@ -40,7 +40,7 @@ Nel diagramma ER, questa relazione deve essere esplicitata chiaramente. Se si pa
 Se l'ER viene lasciato con questo errore, il database soffrirà delle seguenti limitazioni critiche:
 
 1.  **Impossibilità di Navigazione Funzionale:** Non si potrà fare una query per chiedere: *"Mostrami tutti i pathway in cui è coinvolta la funzione enzimatica X"*.
-2.  **Rottura del Mapping Genomico (Annotation):** Il processo logico principale di KEGG è annotare un nuovo genoma. Un gene di un organismo viene assegnato a un KO. Senza il collegamento centrale `KO -> Reference Pathway`, diventa impossibile proiettare i geni specifici di un organismo sui pathway biologici globali. Si saprebbe che funzione ha un gene, ma non in quale rete biologica si inserisce.
+2.  **Rottura del Mapping Genomico (Annotation):** Il processo logico principale di KEGG è annotare un nuovo genoma. Un gene di un organism viene assegnato a un KO. Senza il collegamento centrale `KO -> Reference Pathway`, diventa impossibile proiettare i geni specifici di un organism sui pathway biologici globali. Si saprebbe che funzione ha un gene, ma non in quale rete biologica si inserisce.
 3.  **Incongruenza con i dati reali (API KEGG):** Se si intende popolare il database scaricando i dati da KEGG, i dati nativi collegano intrinsecamente i KO ai Pathway (è una delle relazioni principali del database). Un ER senza questa relazione non potrebbe ospitare questi dati.
 
 ---
@@ -65,7 +65,7 @@ Oltre alla modifica critica tra KO e Pathway, l'aggiunta di altre due entità e 
 
 ### A. Ha senso aggiungere l'entità "KEGG Disease" (Malattia)?
 **ASSOLUTAMENTE SÌ.**
-KEGG possiede un intero database dedicato alle patologie umane (KEGG DISEASE). 
+KEGG possiede un intero database dedicato alle patologie umane (KEGG DISEASE).
 *   **Perché inserirla:** Permette di mappare i processi molecolari (pathway) e i difetti genici (KO) direttamente su fenotipi patologici.
 *   **Relazioni necessarie nell'ER:**
     *   `Disease` <-> `Reference_Pathway`: Molte malattie in KEGG hanno un loro pathway di riferimento dedicato (es. *map05010 per la malattia di Alzheimer*). La relazione è **Molti-a-Molti**.
@@ -86,7 +86,7 @@ L'EC Number (Enzyme Commission number) è la nomenclatura standard internazional
 *Se desideri che il modello includa anche queste aggiunte, puoi aggiungere questo testo al prompt:*
 
 > **Ulteriori Integrazioni Strutturali Richieste per l'ER:**
-> 
+>
 > 1. **Modulo Patologie (Disease):** Inserire una nuova entità **KEGG_Disease**. Stabilire una relazione *Molti-a-Molti (N:M)* tra `KEGG_Disease` e `Reference_Pathway` (poiché esistono pathway che descrivono patologie), e un'altra relazione *Molti-a-Molti (N:M)* tra `KEGG_Disease` e `KEGG_Orthology` (poiché le malattie sono mappate sui geni/ortologhi responsabili).
-> 
+>
 > 2. **Modulo Enzimatico (EC Number):** Inserire l'entità **EC_Number** (classificazione catalitica) e creare una relazione *Molti-a-Molti (N:M)* con `KEGG_Orthology`. Questa relazione è obbligatoria per gestire gli enzimi multifunzionali (un KO, molti EC) e gli isoenzimi non correlati (un EC, molti KO).

@@ -69,7 +69,7 @@ def manifest(directory, kind, reviewed=None):
         "reviewed_only": kind == "swissprot",
         "files": counts,
         "organisms": list(
-            sorted({row["kegg_code"] for row in rows(directory, BY_NAME["ORGANISMO"])})
+            sorted({row["kegg_code"] for row in rows(directory, BY_NAME["ORGANISM"])})
         ),
     }
     destination = directory / "manifest.json"
@@ -228,20 +228,20 @@ def validate(directory, expected_kind="swissprot"):
                 seq = row["amino_acid_sequence"]
                 if len(seq) != int(row["sequence_length"]) or not re.fullmatch(r"[A-Z]+", seq):
                     raise ValueError(f"Invalid protein sequence: {row['accession']}")
-            if name == "ORGANISMO":
+            if name == "ORGANISM":
                 codes.add(row["kegg_code"])
-            if name in {"GENE_KEGG", "PROTEIN_UNIPROT", "PATHWAY_ORGANISMO"}:
+            if name in {"GENE_KEGG", "PROTEIN_UNIPROT", "PATHWAY_ORGANISM"}:
                 identifier = key_value(table, table["pk"][0], row[table["pk"][0]])
                 organisms[(name, identifier)] = int(row["organism_id"])
             if name == "PROTEIN_ISOFORM" and not row["isoform_id"].startswith(
                 row["accession"] + "-"
             ):
                 raise ValueError("Isoform parent mismatch")
-            if name in {"GENE_PROTEINA", "GENE_PATHWAY"}:
+            if name in {"GENE_PROTEIN", "GENE_PATHWAY"}:
                 other = (
                     ("PROTEIN_UNIPROT", row["accession"].lower())
-                    if name == "GENE_PROTEINA"
-                    else ("PATHWAY_ORGANISMO", row["pathway_id"].lower())
+                    if name == "GENE_PROTEIN"
+                    else ("PATHWAY_ORGANISM", row["pathway_id"].lower())
                 )
                 if organisms.get(("GENE_KEGG", row["kegg_gene_id"].lower())) != organisms.get(
                     other

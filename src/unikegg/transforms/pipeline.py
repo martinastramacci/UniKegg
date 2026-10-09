@@ -99,7 +99,7 @@ def run(directory, reviewed_export=None, codes=None):
 def _run(directory, reviewed_export=None):
     directory = Path(directory).resolve()
     directory.parent.mkdir(parents=True, exist_ok=True)
-    old_output, old_relations, old_reports = entities.OUTPUT, relations.OUTPUT, relations.CONTROLLI
+    old_output, old_relations, old_reports = entities.OUTPUT, relations.OUTPUT, relations.REPORTS
     previous_reviewed = os.environ.get("UNIKEGG_REVIEWED_DIR")
     report_copy = None
     with (
@@ -109,7 +109,7 @@ def _run(directory, reviewed_export=None):
         check_destination(directory)
         stage, reports = Path(temporary) / "processed", Path(temporary) / "reports"
         entities.OUTPUT = relations.OUTPUT = stage
-        relations.CONTROLLI = reports
+        relations.REPORTS = reports
         if reviewed_export is not None:
             os.environ["UNIKEGG_REVIEWED_DIR"] = str(Path(reviewed_export).resolve())
         try:
@@ -124,10 +124,10 @@ def _run(directory, reviewed_export=None):
             old_reports.mkdir(parents=True, exist_ok=True)
             with NamedTemporaryFile(dir=old_reports, delete=False) as stream:
                 report_copy = Path(stream.name)
-            shutil.copyfile(reports / "report_gene_proteina.tsv", report_copy)
+            shutil.copyfile(reports / "report_gene_protein.tsv", report_copy)
             publish(stage, directory)
             try:
-                os.replace(report_copy, old_reports / "report_gene_proteina.tsv")
+                os.replace(report_copy, old_reports / "report_gene_protein.tsv")
             except OSError as error:
                 # Domain publication is complete; do not misreport it as rolled back.
                 print(
@@ -145,7 +145,7 @@ def _run(directory, reviewed_export=None):
                 flush=True,
             )
         finally:
-            entities.OUTPUT, relations.OUTPUT, relations.CONTROLLI = (
+            entities.OUTPUT, relations.OUTPUT, relations.REPORTS = (
                 old_output,
                 old_relations,
                 old_reports,

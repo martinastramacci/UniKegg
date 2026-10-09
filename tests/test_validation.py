@@ -42,17 +42,17 @@ def test_sql_contract_violations_rejected(tmp_path, case):
     if case == "duplicate-entry-name":
         rewrite(tmp_path, "protein_uniprot.tsv", lambda data: data[2].__setitem__(2, data[1][2]))
     elif case == "duplicate-taxonomy":
-        rewrite(tmp_path, "organismo.tsv", lambda data: data[2].__setitem__(2, data[1][2]))
+        rewrite(tmp_path, "organism.tsv", lambda data: data[2].__setitem__(2, data[1][2]))
     elif case == "duplicate-kegg-code":
         rewrite(
             tmp_path,
-            "organismo.tsv",
+            "organism.tsv",
             lambda data: data.append([11, data[1][1], 9999999, "Synthetic extra"]),
         )
     elif case == "duplicate-pathway-grain":
         rewrite(
             tmp_path,
-            "pathway_organismo.tsv",
+            "pathway_organism.tsv",
             lambda data: data.append(["ath00011", data[1][1], data[1][2]]),
         )
     elif case == "duplicate-isoform-ordinal":
@@ -71,9 +71,9 @@ def test_sql_contract_violations_rejected(tmp_path, case):
             ),
         )
     elif case == "invalid-decimal":
-        rewrite(tmp_path, "composto_kegg.tsv", lambda data: data[1].__setitem__(3, "not-a-number"))
+        rewrite(tmp_path, "compound_kegg.tsv", lambda data: data[1].__setitem__(3, "not-a-number"))
     elif case == "zero-taxonomy":
-        rewrite(tmp_path, "organismo.tsv", lambda data: data[1].__setitem__(2, "0"))
+        rewrite(tmp_path, "organism.tsv", lambda data: data[1].__setitem__(2, "0"))
     elif case == "oversized-utf8-text":
         rewrite(tmp_path, "protein_uniprot.tsv", lambda data: data[1].__setitem__(3, "é" * 40000))
     elif case == "collation-equivalent-pk":
@@ -82,11 +82,11 @@ def test_sql_contract_violations_rejected(tmp_path, case):
         )
     elif case == "numeric-equivalent-pk":
         rewrite(
-            tmp_path, "organismo.tsv", lambda data: data.append(["01", "oth", 9999999, "Synthetic"])
+            tmp_path, "organism.tsv", lambda data: data.append(["01", "oth", 9999999, "Synthetic"])
         )
     else:
         value = {"unicode-key": "É00001", "space-key": "K00001 ", "null-byte-key": "K\0"}[case]
-        rewrite(tmp_path, "ortologia_kegg.tsv", lambda data: data[1].__setitem__(0, value))
+        rewrite(tmp_path, "orthology_kegg.tsv", lambda data: data[1].__setitem__(0, value))
     with pytest.raises(ValueError):
         validate(tmp_path, "synthetic")
 
@@ -96,7 +96,7 @@ def test_sql_contract_violations_rejected(tmp_path, case):
 )
 def test_decimal_domain_rejected(tmp_path, value):
     generate(tmp_path)
-    rewrite(tmp_path, "composto_kegg.tsv", lambda data: data[1].__setitem__(3, value))
+    rewrite(tmp_path, "compound_kegg.tsv", lambda data: data[1].__setitem__(3, value))
     with pytest.raises(ValueError, match="decimal"):
         validate(tmp_path, "synthetic")
 
@@ -106,7 +106,7 @@ def test_decimal_domain_rejected(tmp_path, value):
 )
 def test_decimal_domain_accepted(tmp_path, value):
     generate(tmp_path)
-    rewrite(tmp_path, "composto_kegg.tsv", lambda data: data[1].__setitem__(3, value))
+    rewrite(tmp_path, "compound_kegg.tsv", lambda data: data[1].__setitem__(3, value))
     validate(tmp_path, "synthetic")
 
 
@@ -157,11 +157,11 @@ def test_reader_configures_own_field_limit(tmp_path):
 
 def test_blank_and_unterminated_csv_rows_rejected(tmp_path):
     generate(tmp_path)
-    path = tmp_path / "numero_ec.tsv"
+    path = tmp_path / "ec_number.tsv"
     for content in ["ec_number\n\n", 'ec_number\n"unterminated\n']:
         path.write_text(content)
         with pytest.raises(ValueError, match="Invalid column count|Invalid TSV"):
-            list(rows(tmp_path, BY_NAME["NUMERO_EC"]))
+            list(rows(tmp_path, BY_NAME["EC_NUMBER"]))
 
 
 @pytest.mark.parametrize(
@@ -176,7 +176,7 @@ def test_manifest_file_metadata_shape(tmp_path, metadata):
     generate(tmp_path)
     path = tmp_path / "manifest.json"
     report = json.loads(path.read_text())
-    report["files"]["organismo.tsv"] = metadata
+    report["files"]["organism.tsv"] = metadata
     path.write_text(json.dumps(report))
     with pytest.raises(ValueError, match="metadata"):
         validate(tmp_path, "synthetic")

@@ -1,5 +1,7 @@
 # Architecture
 
+For installations with previous Italian table or TSV names, first follow the [English naming migration](english-names-migration.md).
+
 ```mermaid
 flowchart TB
     subgraph Acquisition[Explicit acquisition workflow]

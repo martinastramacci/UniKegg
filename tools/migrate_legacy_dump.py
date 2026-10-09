@@ -21,10 +21,23 @@ from unikegg import tsv
 from unikegg.dataset import TABLES, sha256
 from unikegg.identifiers import EC_RE
 from unikegg.kegg_data import acquisition_manifest, orthology_links, strip_prefix, tabular_rows
+from unikegg.legacy_names import LEGACY_TABLE_NAMES
 
 PROJECT = Path(__file__).resolve().parents[1]
-BRIDGES = {"ORTOLOGIA_PATHWAY", "ORTOLOGIA_EC"}
-CATALOGS = {"ORTOLOGIA_KEGG", "PATHWAY_RIFERIMENTO", "NUMERO_EC"}
+BRIDGES = {"ORTHOLOGY_PATHWAY", "ORTHOLOGY_EC"}
+CATALOGS = {"ORTHOLOGY_KEGG", "PATHWAY_REFERENCE", "EC_NUMBER"}
+
+
+def source_dump_file(source, name):
+    reverse = {new: old for old, new in LEGACY_TABLE_NAMES.items()}
+    candidates = {
+        Path(source) / f"unikegg_{value.lower()}.sql"
+        for value in (name, reverse.get(name, name))
+    }
+    found = [path for path in candidates if path.is_file()]
+    if len(found) != 1:
+        raise ValueError(f"Expected exactly one legacy or English dump file for {name}: {found}")
+    return found[0]
 
 
 def emit(message):
@@ -149,8 +162,8 @@ def audit(connection):
             findings[f"orphan:{child}.{column}"] = n
     for name, sql in {
         "invalid_protein_sequence": "SELECT COUNT(*) FROM PROTEIN_UNIPROT WHERE CHAR_LENGTH(amino_acid_sequence) <> sequence_length OR NOT REGEXP_LIKE(amino_acid_sequence, '^[A-Z]+$', 'c')",
-        "gene_protein_species_mismatch": "SELECT COUNT(*) FROM GENE_PROTEINA gp JOIN GENE_KEGG g USING(kegg_gene_id) JOIN PROTEIN_UNIPROT p USING(accession) WHERE g.organism_id <> p.organism_id",
-        "gene_pathway_species_mismatch": "SELECT COUNT(*) FROM GENE_PATHWAY gp JOIN GENE_KEGG g USING(kegg_gene_id) JOIN PATHWAY_ORGANISMO p USING(pathway_id) WHERE g.organism_id <> p.organism_id",
+        "gene_protein_species_mismatch": "SELECT COUNT(*) FROM GENE_PROTEIN gp JOIN GENE_KEGG g USING(kegg_gene_id) JOIN PROTEIN_UNIPROT p USING(accession) WHERE g.organism_id <> p.organism_id",
+        "gene_pathway_species_mismatch": "SELECT COUNT(*) FROM GENE_PATHWAY gp JOIN GENE_KEGG g USING(kegg_gene_id) JOIN PATHWAY_ORGANISM p USING(pathway_id) WHERE g.organism_id <> p.organism_id",
         "isoform_parent_mismatch": "SELECT COUNT(*) FROM PROTEIN_ISOFORM WHERE isoform_id NOT LIKE CONCAT(accession, '-%')",
     }.items():
         findings[name] = query(connection, sql)[0][0]
@@ -191,7 +204,7 @@ def direct_links(raw):
 
 def run(source, output, raw):
     output.mkdir(parents=True, exist_ok=True)
-    dump = output / "unikegg_aggiornato.sql"
+    dump = output / "unikegg_updated.sql"
     if dump.exists() or (output / "migration_report.json").exists():
         raise ValueError("Refusing to overwrite an already exported migration")
     metadata = acquisition_manifest(raw)
@@ -221,7 +234,7 @@ def run(source, output, raw):
         report["mysql_version"] = query(connection, "SELECT VERSION()")[0][0]
         for table in old_tables:
             name = table["name"]
-            path = source / f"unikegg_{name.lower()}.sql"
+            path = source_dump_file(source, name)
             report["source_files"][path.name] = {
                 "bytes": path.stat().st_size,
                 "sha256": sha256(path),
@@ -229,12 +242,20 @@ def run(source, output, raw):
             emit(f"Restoring {path.name}")
             import_sql(socket, "migrated", path)
         actual = {r[0] for r in query(connection, "SHOW TABLES")}
-        if actual != {t["name"].lower() for t in old_tables}:
+        reverse = {new: old for old, new in LEGACY_TABLE_NAMES.items()}
+        imported = {}
+        for table in old_tables:
+            name = table["name"]
+            candidates = {name.lower(), reverse.get(name, name).lower()} & actual
+            if len(candidates) != 1:
+                raise ValueError(f"Ambiguous or missing imported table: {name}: {candidates}")
+            imported[name] = candidates.pop()
+        if actual != set(imported.values()):
             raise ValueError(f"Unexpected tables: {actual}")
         execute(
             connection,
             "RENAME TABLE "
-            + ", ".join(f"`{t['name'].lower()}` TO `{t['name']}`" for t in old_tables),
+            + ", ".join(f"`{imported[t['name']]}` TO `{t['name']}`" for t in old_tables),
         )
         for table in old_tables:
             name = table["name"]
@@ -247,10 +268,10 @@ def run(source, output, raw):
             original_fingerprints[name] = fingerprint(connection, name, columns, table["pk"])
             emit(f"Original {name}: {original_fingerprints[name]['rows']} rows")
         report["original_tables"] = original_fingerprints
-        if "evidence_code" not in original_columns["PROTEINA_GO"]:
+        if "evidence_code" not in original_columns["PROTEIN_GO"]:
             execute(
                 connection,
-                "ALTER TABLE PROTEINA_GO ADD COLUMN evidence_code VARCHAR(12) NULL, ADD COLUMN evidence_source VARCHAR(100) NULL",
+                "ALTER TABLE PROTEIN_GO ADD COLUMN evidence_code VARCHAR(12) NULL, ADD COLUMN evidence_source VARCHAR(100) NULL",
             )
         migration = (PROJECT / "db/migrations/004_orthology_links.sql").read_text()
         for sql in re.sub(r"--[^\n]*", "", migration).split(";"):
@@ -261,24 +282,24 @@ def run(source, output, raw):
         ko_rows = []
         for identifier, description in tabular_rows(raw / "ko/ko_list.tsv"):
             ko = strip_prefix(identifier)
-            if (ko,) not in original_keys["ORTOLOGIA_KEGG"]:
+            if (ko,) not in original_keys["ORTHOLOGY_KEGG"]:
                 ko_rows.append((ko, description.split(";", 1)[0].strip(), description))
         pathway_rows = [
             (strip_prefix(i), d)
             for i, d in tabular_rows(raw / "pathway/pathway_reference.tsv")
-            if (strip_prefix(i),) not in original_keys["PATHWAY_RIFERIMENTO"]
+            if (strip_prefix(i),) not in original_keys["PATHWAY_REFERENCE"]
         ]
         ec_rows = [
             (ec,)
             for ec in sorted({ec for _, ec in links["ec"]})
-            if (ec,) not in original_keys["NUMERO_EC"]
+            if (ec,) not in original_keys["EC_NUMBER"]
         ]
         for name, records in [
-            ("ORTOLOGIA_KEGG", ko_rows),
-            ("PATHWAY_RIFERIMENTO", pathway_rows),
-            ("NUMERO_EC", ec_rows),
-            ("ORTOLOGIA_PATHWAY", links["pathway"]),
-            ("ORTOLOGIA_EC", links["ec"]),
+            ("ORTHOLOGY_KEGG", ko_rows),
+            ("PATHWAY_REFERENCE", pathway_rows),
+            ("EC_NUMBER", ec_rows),
+            ("ORTHOLOGY_PATHWAY", links["pathway"]),
+            ("ORTHOLOGY_EC", links["ec"]),
         ]:
             additions[name] = len(records)
             with connection.cursor() as cursor:
@@ -305,9 +326,9 @@ def run(source, output, raw):
             strip_prefix(row[0]) for row in tabular_rows(raw / "pathway/pathway_reference.tsv")
         }
         report["legacy_catalog_ids_absent_from_current_kegg"] = {
-            "ko": sorted(k[0] for k in original_keys["ORTOLOGIA_KEGG"] if k[0] not in current_kos),
+            "ko": sorted(k[0] for k in original_keys["ORTHOLOGY_KEGG"] if k[0] not in current_kos),
             "pathway": sorted(
-                k[0] for k in original_keys["PATHWAY_RIFERIMENTO"] if k[0] not in current_maps
+                k[0] for k in original_keys["PATHWAY_REFERENCE"] if k[0] not in current_maps
             ),
         }
         processed = output / "tsv"
@@ -322,7 +343,7 @@ def run(source, output, raw):
                 )
             final[table["name"]]["tsv_sha256"] = sha256(processed / table["file"])
         report["final_tables"] = final
-        candidate = output / "unikegg_aggiornato.sql.part"
+        candidate = output / "unikegg_updated.sql.part"
         with candidate.open("wb") as stream:
             subprocess.run(
                 [

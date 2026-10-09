@@ -14,10 +14,10 @@ from unikegg.loader import load_statements
 
 
 def test_path_with_apostrophe_and_semicolon():
-    sql = "LOAD DATA LOCAL INFILE '{{DATA_DIR}}/organismo.tsv' INTO TABLE ORGANISMO;"
+    sql = "LOAD DATA LOCAL INFILE '{{DATA_DIR}}/organism.tsv' INTO TABLE ORGANISM;"
     result = list(load_statements(sql, Path("/data/owner's;files")))
     assert len(result) == 1
-    assert 'INFILE "/data/owner\'s;files/organismo.tsv"' in result[0]
+    assert 'INFILE "/data/owner\'s;files/organism.tsv"' in result[0]
 
 
 def rewrite(directory, filename, mutate):
@@ -55,28 +55,28 @@ def test_sequence_mismatch(tmp_path):
 
 def test_cross_species_mapping(tmp_path):
     generate(tmp_path)
-    rewrite(tmp_path, "gene_proteina.tsv", lambda rows: rows[1].__setitem__(1, "SYN000002"))
+    rewrite(tmp_path, "gene_protein.tsv", lambda rows: rows[1].__setitem__(1, "SYN000002"))
     with pytest.raises(ValueError, match="Organism mismatch"):
         validate(tmp_path, "synthetic")
 
 
 def test_orphan(tmp_path):
     generate(tmp_path)
-    rewrite(tmp_path, "reazione_ec.tsv", lambda rows: rows[1].__setitem__(1, "9.9.9.9"))
+    rewrite(tmp_path, "reaction_ec.tsv", lambda rows: rows[1].__setitem__(1, "9.9.9.9"))
     with pytest.raises(ValueError, match="Orphan reference"):
         validate(tmp_path, "synthetic")
 
 
 def test_duplicate_key(tmp_path):
     generate(tmp_path)
-    rewrite(tmp_path, "numero_ec.tsv", lambda rows: rows.append(rows[1]))
+    rewrite(tmp_path, "ec_number.tsv", lambda rows: rows.append(rows[1]))
     with pytest.raises(ValueError, match="duplicate key"):
         validate(tmp_path, "synthetic")
 
 
 def test_checksum_mismatch(tmp_path):
     generate(tmp_path)
-    path = tmp_path / "numero_ec.tsv"
+    path = tmp_path / "ec_number.tsv"
     with path.open("a", encoding="utf-8") as stream:
         stream.write("9.9.9.9\n")
     with pytest.raises(ValueError, match="Checksum mismatch"):

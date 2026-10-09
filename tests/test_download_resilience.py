@@ -364,7 +364,7 @@ def setup_pipeline(home, monkeypatch):
     generate(home)
     monkeypatch.setattr(entities, "RAW_KEGG", home / "data/raw/kegg")
     monkeypatch.setattr(relations, "RAW_KEGG", home / "data/raw/kegg")
-    monkeypatch.setattr(relations, "CONTROLLI", home / "artifacts")
+    monkeypatch.setattr(relations, "REPORTS", home / "artifacts")
 
 
 def test_transform_subset_and_repeat_preserve_scope(tmp_path, monkeypatch):
@@ -375,19 +375,19 @@ def test_transform_subset_and_repeat_preserve_scope(tmp_path, monkeypatch):
         report, _ = validate(output)
         assert set(report["organisms"]) == set(codes)
         assert len(list(rows(output, BY_NAME["PROTEIN_UNIPROT"]))) == len(codes)
-    assert {r["organism_id"] for r in rows(output, BY_NAME["ORGANISMO"])} == {"1", "9"}
+    assert {r["organism_id"] for r in rows(output, BY_NAME["ORGANISM"])} == {"1", "9"}
 
 
 def test_transform_all_curated_organisms(tmp_path, monkeypatch):
     import tests.raw_fixture as fixture
 
-    monkeypatch.setattr(fixture, "ORGANISMI", [(o.id, o.code) for o in CATALOG])
+    monkeypatch.setattr(fixture, "ORGANISMS", [(o.id, o.code) for o in CATALOG])
     setup_pipeline(tmp_path, monkeypatch)
     output = tmp_path / "data/processed"
     pipeline.run(output, tmp_path / "data/raw/uniprot", codes=select(all_organisms=True))
     report, _ = validate(output)
     assert len(report["organisms"]) == 16
-    assert report["files"]["gene_proteina.tsv"]["rows"] == 32
+    assert report["files"]["gene_protein.tsv"]["rows"] == 32
 
 
 def test_managed_taxonomy_does_not_require_protein_xrefs(tmp_path, monkeypatch):
@@ -404,7 +404,7 @@ def test_managed_taxonomy_does_not_require_protein_xrefs(tmp_path, monkeypatch):
     pipeline.run(output, raw, codes=["hsa"])
     report, _ = validate(output)
     assert report["files"]["protein_uniprot.tsv"]["rows"] == 0
-    assert list(rows(output, BY_NAME["ORGANISMO"]))[0]["taxonomy_id"] == "9606"
+    assert list(rows(output, BY_NAME["ORGANISM"]))[0]["taxonomy_id"] == "9606"
 
 
 def test_detail_refresh_uses_only_active_index(tmp_path, monkeypatch):

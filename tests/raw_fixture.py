@@ -4,7 +4,7 @@ import csv
 import gzip
 from pathlib import Path
 
-from unikegg.transforms.entities import ORGANISMI
+from unikegg.transforms.entities import ORGANISMS
 
 HEADERS = [
     "Entry",
@@ -48,7 +48,7 @@ def generate(home):
     home = Path(home)
     kegg = home / "data/raw/kegg"
     proteins, organisms = [], []
-    for index, code in ORGANISMI:
+    for index, code in ORGANISMS:
         accession, gene = f"SYN{index:06d}", f"{code}:demo1"
         proteins.append(
             [

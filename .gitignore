@@ -7,11 +7,12 @@
 *.cnf
 
 # Upstream data and database exports are distributed separately.
-data/raw/**
+data/**
+!data/raw/
 !data/raw/.gitkeep
-data/processed/**
+!data/processed/
 !data/processed/.gitkeep
-data/manifests/**
+!data/manifests/
 !data/manifests/.gitkeep
 artifacts/**
 !artifacts/.gitkeep
@@ -38,6 +39,3 @@ dist/
 htmlcov/
 .DS_Store
 Thumbs.db
-
-# Ignored Italian documentation
-docs/guida-comandi.md

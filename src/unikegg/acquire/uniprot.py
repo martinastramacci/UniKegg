@@ -21,8 +21,8 @@ from unikegg.organisms import BY_CODE, CATALOG, DEFAULT_CODES, select
 
 RAW = RAW_ROOT / "uniprot"
 URL = "https://rest.uniprot.org/uniprotkb/stream"
-ORGANISMI = tuple((BY_CODE[c].taxid, c) for c in DEFAULT_CODES)
-CAMPI = (
+ORGANISMS = tuple((BY_CODE[c].taxid, c) for c in DEFAULT_CODES)
+FIELDS = (
     "accession",
     "id",
     "reviewed",
@@ -92,14 +92,14 @@ REQUIRED_COLUMNS = {
 }
 
 
-def crea_url(query: str, formato: str, campi=()) -> str:
+def build_url(query: str, formato: str, campi=()) -> str:
     parameters = {"query": query, "format": formato, "compressed": "true"}
     if campi:
         parameters["fields"] = ",".join(campi)
     return URL + "?" + urllib.parse.urlencode(parameters)
 
 
-def controlla_gzip(path):
+def check_gzip(path):
     size = 0
     with gzip.open(path, "rb") as stream:
         while block := stream.read(1024 * 1024):
@@ -135,7 +135,7 @@ def query_taxid(url):
 
 
 def validate_export(path, url):
-    controlla_gzip(path)
+    check_gzip(path)
     if ".tsv.gz" in path.name:
         with gzip.open(path, "rt", encoding="utf-8", newline="") as stream:
             return validate_tsv(stream, query_taxid(url))[1]
@@ -196,7 +196,7 @@ def record(path, url, metadata, **extra):
     metadata[item["file"]] = item
 
 
-def scarica(
+def download(
     url, destinazione, dry_run=False, *, client=None, metadata=None, refresh=False, refresh_id=None
 ):
     print("GET", url, "->", destinazione, flush=True)
@@ -397,8 +397,8 @@ def planned_requests(codes=None, include_json=False):
         if current.exists() and legacy.exists():
             raise ValueError(f"Duplicate UniProt exports: {current.name} and {legacy.name}")
         if include_json:
-            tasks.append((crea_url(query, "json"), RAW / f"{taxid}_{code}.json.gz"))
-        tasks.append((crea_url(query, "tsv", CAMPI), legacy if legacy.exists() else current))
+            tasks.append((build_url(query, "json"), RAW / f"{taxid}_{code}.json.gz"))
+        tasks.append((build_url(query, "tsv", FIELDS), legacy if legacy.exists() else current))
     return tasks
 
 
@@ -491,7 +491,7 @@ def run(
             if ".tsv.gz" in destination.name:
                 paginated(url, destination, client, metadata, refresh, refresh_id)
             else:
-                scarica(
+                download(
                     url,
                     destination,
                     client=client,

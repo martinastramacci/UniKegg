@@ -1,135 +1,81 @@
-# Migrazione delle relazioni KO–Pathway e KO–EC
+# Migrate the KO–Pathway and KO–EC relationships
 
-Il modello comprende **22 tabelle biologiche: 11 entità e 11 associazioni**.
-`ORTOLOGIA_PATHWAY(ko_id, map_id)` collega `ORTOLOGIA_KEGG` a
-`PATHWAY_RIFERIMENTO`; `ORTOLOGIA_EC(ko_id, ec_number)` collega KO al catalogo
-esistente `NUMERO_EC`. Entrambe hanno PK composite, FK non nulle, indici per
-la ricerca inversa e vincoli `ON DELETE RESTRICT ON UPDATE RESTRICT`.
+For installation, server startup and credentials, choose [Python and SQL without Docker](command-guide.md#a-python-and-sql-without-docker) or [Docker and SQL](command-guide.md#b-docker-and-sql). This page describes the individual operation in more detail.
 
-Le associazioni sono N:M e facoltative: un KO può avere più EC e più pathway,
-oppure nessuno. Non tutti i KO sono enzimi. Le mappe KEGG comprendono anche
-composti e altre componenti; le rappresentazioni di riferimento possono essere
-basate su KO, EC o reazioni. Un EC descrive una classificazione catalitica,
-non identifica necessariamente una singola reazione KEGG. Il collegamento
-`EC → KO → Pathway` indica annotazioni condivise, non dimostra che ogni attività
-EC di un KO multifunzionale sia impiegata in ciascuno dei suoi pathway.
-Fonti: [KEGG PATHWAY](https://www.kegg.jp/kegg/pathway.html) e
-[manuale API KEGG](https://www.kegg.jp/kegg/rest/keggapi.html).
+For installations with previous Italian table or TSV names, first follow the [English naming migration](english-names-migration.md).
 
-## Download e pulizia
+[Italian copy](orthology-migration.it.md). Installations with Italian domain names must first follow the [English naming migration](english-names-migration.md).
 
-L'API usa `link/<target>/<source>`; scegliamo KO come sorgente, quindi la prima
-colonna dei raw è il KO:
+The model contains **22 biological tables: 11 entities and 11 associations**. `ORTHOLOGY_PATHWAY(ko_id, map_id)` joins `ORTHOLOGY_KEGG` to `PATHWAY_REFERENCE`; `ORTHOLOGY_EC(ko_id, ec_number)` joins KO to the existing `EC_NUMBER` catalog. Both use composite primary keys, non-null foreign keys, reverse-lookup indexes and `ON DELETE RESTRICT ON UPDATE RESTRICT`.
 
-| Endpoint | Raw sotto `data/raw/kegg/` | TSV sotto `data/processed/` |
+These optional many-to-many associations allow a KO to have multiple EC numbers and pathways, or none. Not every KO is an enzyme. KEGG maps also contain compounds and other components; reference representations can use KO, EC or reactions. An EC number describes a catalytic classification and does not necessarily identify one KEGG reaction. `EC → KO → Pathway` expresses shared annotations; it does not prove that every EC activity of a multifunctional KO participates in all its pathways. Sources: [KEGG PATHWAY](https://www.kegg.jp/kegg/pathway.html), [KEGG API manual](https://www.kegg.jp/kegg/rest/keggapi.html).
+
+## Download and normalization
+
+The API uses `link/<target>/<source>`. KO is the source, so the first raw column is KO:
+
+| Endpoint | Raw under `data/raw/kegg/` | TSV under `data/processed/` |
 |---|---|---|
-| `/link/pathway/ko` | `relations/ko_pathway.tsv` | `ortologia_pathway.tsv`: `ko_id`, `map_id` |
-| `/link/enzyme/ko` | `relations/ko_ec.tsv` | `ortologia_ec.tsv`: `ko_id`, `ec_number` |
+| `/link/pathway/ko` | `relations/ko_pathway.tsv` | `orthology_pathway.tsv`: `ko_id`, `map_id` |
+| `/link/enzyme/ko` | `relations/ko_ec.tsv` | `orthology_ec.tsv`: `ko_id`, `ec_number` |
 
-`/link/ko/pathway` e `/link/ko/enzyme` interrogano la direzione inversa e
-restituiscono colonne invertite: non sostituire quei raw ai file qui descritti.
-La pipeline elimina i prefissi `ko:`, `path:` ed `ec:`, converte sia
-`path:ko00010` sia `path:map00010` in `map00010`, ordina e deduplica le coppie.
-Mantiene gli EC preliminari e incompleti, per esempio `3.5.1.n3` e `1.1.1.-`.
-Il catalogo EC è l'unione di UniProt, campi ENZYME delle reazioni selezionate e
-link diretti KO–EC; un EC presente solo in questi ultimi viene conservato.
+`/link/ko/pathway` and `/link/ko/enzyme` use the reverse direction and return reversed columns. Do not substitute their exports for the files described here. The pipeline removes `ko:`, `path:` and `ec:`, converts both `path:ko00010` and `path:map00010` into `map00010`, and sorts and deduplicates pairs. Preliminary and incomplete EC numbers such as `3.5.1.n3` and `1.1.1.-` are preserved. The EC catalog is the union of UniProt annotations, selected reaction ENZYME fields and direct KO–EC links; EC numbers found only in the last source are retained.
 
-Le relazioni coprono tutti i KO e reference pathway dei cataloghi scaricati,
-anche quelli senza geni negli organismi selezionati. Identificatori malformati,
-KO/pathway privi del rispettivo padre e file mancanti interrompono la
-trasformazione, preservando il precedente bundle. File di relazione vuoti ma
-validi producono TSV con sola intestazione. Non si deducono collegamenti
-attraverso reazioni o proteine.
+Relationships cover all KOs and reference pathways in the downloaded catalogs, including those without genes in selected organisms. Malformed identifiers, unresolved parents and missing files stop transformation and preserve the previous bundle. Valid empty relationship exports produce header-only TSVs. Links are not inferred through reactions or proteins. Verified HTTP 404 KO–EC orphans are quarantined with warnings, using the evidence described in [operations](operations.md).
 
-Con l'ambiente Python aggiornato, dalla radice del progetto:
+From the project root with the updated Python environment:
 
 ```bash
-# Usare la stessa selezione KEGG/UniProt dello snapshot esistente.
-# Esempio per una selezione hsa,eco già disponibile in UniProt:
+# Use the same KEGG/UniProt selection as the existing snapshot.
+# Example: hsa,eco already available in UniProt.
 unikegg download-kegg --organisms hsa,eco
 unikegg transform
 unikegg validate
 ```
 
-Per tutti i 16 organismi, omettere `--organisms` solo se anche l'export UniProt
-li copre. Il download riusa i file con cache verificata e acquisisce quelli
-mancanti; `--refresh` rinnova tutte le richieste. Per esportazioni manuali
-autorizzate fornire i due nuovi raw nell'ordine indicato. `transform` genera
-tutti i **22 TSV e un nuovo manifest**: non basta aggiungere due file al vecchio
-manifest, né crearli vuoti per aggirare i controlli.
+Omit `--organisms` for all 16 only when the UniProt export also covers them. Downloads reuse verified cached files and acquire missing files; `--refresh` renews all requests. Authorized manual exports must provide both new raw files in the stated order. `transform` generates **all 22 TSVs and a new manifest**. Adding two files to an old manifest, or creating empty files to bypass checks, is insufficient.
 
-## Schema nuovo o database già popolato
+## New schema or an existing populated database
 
-Per un database nuovo, `db/init/001_schema.sql` comprende già le due tabelle.
-Dopo avere preparato i 22 TSV, `docker compose up --build` inizializza e importa
-il dataset con `db/load/001_ingest.sql`, caricando i cataloghi prima dei link.
+`db/init/001_schema.sql` includes both bridges for new databases. After preparing the 22 TSVs, `docker compose up --build` initializes and imports the dataset using `db/load/001_ingest.sql`, loading catalogs before relationships.
 
-Per un volume esistente, i file `db/init` non vengono rieseguiti. Conservare un
-backup del database e del bundle precedente, sospendere altri writer e applicare
-la migrazione additiva con l'account del database configurato in Compose:
+Initialization files are not rerun for existing volumes. Back up the database and previous bundle, suspend other writers, and apply the additive migration using the configured Compose account. First migrate Italian table names if applicable.
 
 ```bash
 docker compose up -d mysql
 docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql -u"$MYSQL_USER" "$MYSQL_DATABASE"' < db/migrations/004_orthology_links.sql
 docker compose build etl
 docker compose run --rm etl update --dry-run
-docker compose run --rm etl update --version-label "Relazioni dirette KO-Pathway e KO-EC"
+docker compose run --rm etl update --version-label "Direct KO-Pathway and KO-EC relationships"
 docker compose run --rm etl verify
 docker compose run --rm etl history
 ```
 
-Senza Compose, applicare lo stesso SQL con il client `mysql` al database
-configurato, poi usare `unikegg update --dry-run`, `unikegg update` e
-`unikegg verify`. Se il database non ha ancora un dataset caricato, usare
-`load` al posto di `update`.
+Without Compose, apply the same SQL through `mysql` to the configured database, then run `unikegg update --dry-run`, `unikegg update` and `unikegg verify`. If no dataset has been loaded, use `load` instead of `update`.
 
-La migrazione richiede `CREATE` e `REFERENCES`, conserva le tabelle e i dati
-esistenti e non disabilita le FK. `IF NOT EXISTS` permette di riprenderla dopo
-un'interruzione, ma non corregge tabelle omonime con uno schema diverso.
-Il DDL MySQL effettua commit impliciti: la migrazione precede la transazione
-di aggiornamento e può restare applicata con tabelle vuote se l'ETL fallisce.
-`update` sincronizza l'intero bundle, comprese le nuove associazioni, e registra
-la nuova versione solo dopo la verifica. Il dry-run va eseguito dopo la migrazione.
-Un vecchio bundle a 20 file viene rifiutato dal validatore attuale.
+The migration requires `CREATE` and `REFERENCES`, preserves existing tables and values and does not disable foreign keys. `IF NOT EXISTS` permits resuming after interruption but does not repair same-name tables with another schema. MySQL DDL commits implicitly: migration precedes the update transaction and may leave empty bridges if ETL fails. `update` synchronizes the complete bundle, including the new associations, and records a new version after verification. Run the dry-run after migration. The current validator rejects old 20-file bundles.
 
-## Verifica del mapping
+## Verify the mapping
 
 ```sql
 SELECT ko_id, COUNT(*) AS pathway_count
-FROM ORTOLOGIA_PATHWAY GROUP BY ko_id;
+FROM ORTHOLOGY_PATHWAY GROUP BY ko_id;
 
 SELECT oe.ec_number, oe.ko_id, op.map_id, p.name
-FROM ORTOLOGIA_EC AS oe
-INNER JOIN ORTOLOGIA_PATHWAY AS op ON op.ko_id = oe.ko_id
-INNER JOIN PATHWAY_RIFERIMENTO AS p ON p.map_id = op.map_id
+FROM ORTHOLOGY_EC AS oe
+INNER JOIN ORTHOLOGY_PATHWAY AS op ON op.ko_id = oe.ko_id
+INNER JOIN PATHWAY_REFERENCE AS p ON p.map_id = op.map_id
 WHERE oe.ec_number = '1.1.1.1';
 ```
 
-Il diagramma ER aggiornato e i vincoli sono descritti in [schema.md](schema.md).
+See [schema.md](schema.md) for the ER diagram and constraints.
 
-## Dump legacy con nomi minuscoli
+## Legacy dumps with lowercase names
 
-Il dump Windows `dump_progetto_completo` del 30 settembre 2026 usa nomi di
-tabella minuscoli e non comprende le colonne di evidenza GO del contratto
-attuale. Su Linux, dove i nomi possono essere case-sensitive, la sola migrazione
-SQL precedente non basta per questo specifico schema.
+The Windows `dump_progetto_completo` dump dated 30 September 2026 uses lowercase tables and lacks the current GO evidence columns. On Linux, where table names can be case-sensitive, the preceding SQL migration alone is insufficient for that schema.
 
-`tools/migrate_legacy_dump.py` ripristina i venti file in un MySQL temporaneo senza
-listener TCP, allinea i nomi, aggiunge le colonne GO come NULL e popola i due
-collegamenti da raw KEGG con checksum verificati. Conserva tutti i valori
-originali, aggiunge i cataloghi mancanti, esporta SQL/TSV e verifica il dump
-reimportandolo in un secondo database. Richiede i binari nativi `mysqld`,
-`mysql`, `mysqldump` e le dipendenze Python del progetto. Non si collega a un
-server preesistente. Il dump SQL risultante va importato in uno schema vuoto.
+`tools/migrate_legacy_dump.py` restores the twenty files into a temporary MySQL instance without a TCP listener, aligns table names, adds GO evidence columns as NULL, and populates the two bridges from checksummed KEGG raw files. It accepts legacy Italian dump filenames as well as English filenames, preserves original values, adds missing catalog parents, exports SQL/TSV and verifies the dump by reimporting into a second database. Native `mysqld`, `mysql`, `mysqldump` binaries and Python dependencies are required. It does not connect to existing servers. Import the resulting SQL dump into an empty schema.
 
-La migrazione reale del 5 ottobre ha preservato 2.006.370 righe originali e
-prodotto 2.066.856 righe in 22 tabelle. Il pacchetto consegnato include i raw,
-il rapporto, le istruzioni e tutti i checksum. Un solo link KO–EC, relativo
-a K10658 assente dal catalogo e confermato HTTP 404 da KEGG, è stato escluso
-con evidenza registrata. La pipeline ordinaria mantiene il rifiuto degli
-orfani; lo strumento legacy richiede una verifica esplicita prima di escluderli.
+The real migration performed on 5 October preserved 2,006,370 original rows and produced 2,066,856 rows across 22 tables. The delivery included raw sources, report, instructions and checksums. One KO–EC link for K10658, absent from the catalog and independently confirmed HTTP 404, was excluded with recorded evidence. Ordinary transformation and the legacy tool both require matching independent evidence before quarantine.
 
-Non viene fabbricato un manifest Swiss-Prot dal solo dump: la provenienza
-reviewed necessita degli export verificati. Questa consegna è un dump SQL
-autonomo, senza uno storico ETL inventato; non costituisce un refresh completo
-di tutte le annotazioni biologiche.
+No Swiss-Prot manifest is fabricated from a dump alone: reviewed provenance requires verified exports. The delivery is a standalone SQL dump without invented ETL history, and is not a complete biological annotation refresh.

@@ -115,7 +115,7 @@ def test_loader_branches(tmp_path, monkeypatch, mode):
 @pytest.mark.parametrize("run", [loader.run, updater.run])
 def test_no_db_connection_for_invalid_bundle(tmp_path, monkeypatch, run):
     directory = generate(tmp_path)
-    (directory / "numero_ec.tsv").write_text("modified without updating the manifest\n")
+    (directory / "ec_number.tsv").write_text("modified without updating the manifest\n")
     connect = Mock()
     monkeypatch.setattr(loader, "PROCESSED", directory)
     monkeypatch.setattr(loader, "connect", connect)

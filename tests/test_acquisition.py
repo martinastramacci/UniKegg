@@ -4,11 +4,13 @@ import http.client
 import io
 import json
 import sys
+import urllib.error
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 
+from tests.raw_fixture import generate, raw_tsv
 from unikegg import cli, loader
 from unikegg.acquire import common, kegg, uniprot
 from unikegg.dataset import sha256
@@ -63,7 +65,7 @@ def test_legacy_uniprot_name_reused_without_creating_duplicate(tmp_path, monkeyp
     assert uniprot.planned_requests()[0][1] == legacy
     (tmp_path / "9606_hsa.tsv.gz").write_bytes(b"other")
     download = Mock()
-    monkeypatch.setattr(uniprot, "scarica", download)
+    monkeypatch.setattr(uniprot, "download", download)
     with pytest.raises(ValueError, match="Duplicate UniProt exports"):
         uniprot.run()
     download.assert_not_called()
@@ -79,6 +81,155 @@ def cache(root, relative, endpoint, payload):
 
 
 GOOD_RECORD = b"ENTRY       R00001 Reaction\nNAME        Synthetic\n///\n"
+
+
+@pytest.mark.parametrize("repair", ["gene", "pathway", "deleted-gene", "none"])
+def test_organism_catalog_reconciliation_refreshes_only_inconsistent_sources(
+    tmp_path, monkeypatch, repair,
+):
+    generate(tmp_path)
+    root = tmp_path / "data/raw/kegg"
+    monkeypatch.setattr(kegg, "ROOT", root)
+    relation = root / "relations/hsa_gene_pathway.tsv"
+    gene = "hsa:demo1" if repair == "pathway" else "hsa:missing"
+    pathway = "path:hsa00020" if repair == "pathway" else "path:hsa00010"
+    raw_tsv(relation, [[gene, pathway]])
+    original = relation.read_bytes()
+    calls = []
+
+    def fetch(endpoint, relative, **kwargs):
+        assert kwargs["refresh"]
+        calls.append(endpoint)
+        if endpoint == "/list/hsa" and repair == "gene":
+            with (root / relative).open("a") as stream:
+                stream.write("hsa:missing\tCDS\t1..3\tRecovered gene\n")
+        if endpoint == "/list/pathway/hsa" and repair == "pathway":
+            raw_tsv(root / relative, [["path:hsa00010", "Old"], ["path:hsa00020", "New"]])
+        if endpoint == "/link/pathway/hsa" and repair == "deleted-gene":
+            raw_tsv(root / relative, [["hsa:demo1", "path:hsa00010"]])
+
+    monkeypatch.setattr(kegg, "fetch", fetch)
+    client = Mock()
+    client.get.return_value = b"ENTRY       missing Gene\nNAME        Still exists\n///\n"
+    if repair == "none":
+        with pytest.raises(ValueError, match="after targeted refresh"):
+            kegg.reconcile_organism_catalogs(["hsa"], client, {})
+        assert relation.read_bytes() == original
+    else:
+        kegg.reconcile_organism_catalogs(["hsa"], client, {})
+    assert calls[:2] == ["/list/hsa", "/list/pathway/hsa"]
+    assert ("/link/pathway/hsa" in calls) == (repair in {"deleted-gene", "none"})
+
+
+def test_consistent_organism_catalogs_need_no_refresh(tmp_path, monkeypatch):
+    generate(tmp_path)
+    monkeypatch.setattr(kegg, "ROOT", tmp_path / "data/raw/kegg")
+    fetch = Mock()
+    monkeypatch.setattr(kegg, "fetch", fetch)
+    kegg.reconcile_organism_catalogs(["hsa"], Mock(), {})
+    fetch.assert_not_called()
+
+
+def test_inconsistent_organism_links_fail_before_detail_batches(tmp_path, monkeypatch):
+    generate(tmp_path)
+    root = tmp_path / "data/raw/kegg"
+    monkeypatch.setattr(kegg, "ROOT", root)
+    raw_tsv(root / "relations/hsa_gene_pathway.tsv", [["hsa:missing", "path:hsa00010"]])
+    monkeypatch.setattr(kegg, "fetch", Mock())
+    client = Mock()
+    client.get.return_value = b"ENTRY       missing Gene\nNAME        Still exists\n///\n"
+    monkeypatch.setattr(kegg, "HttpClient", Mock(return_value=client))
+    details = Mock()
+    monkeypatch.setattr(kegg, "selected_details", details)
+    with pytest.raises(ValueError, match="after targeted refresh"):
+        kegg.run(codes=["hsa"])
+    details.assert_not_called()
+    assert json.loads((root / "selection.json").read_text())["status"] == "incomplete"
+
+
+@pytest.mark.parametrize("status", [404, 403, 503])
+def test_stale_gene_pathway_requires_independent_404(tmp_path, monkeypatch, status):
+    generate(tmp_path)
+    root = tmp_path / "data/raw/kegg"
+    monkeypatch.setattr(kegg, "ROOT", root)
+    monkeypatch.setattr(kegg, "fetch", Mock())
+    relation = root / "relations/hsa_gene_pathway.tsv"
+    raw_tsv(relation, [["hsa:missing", "path:hsa00010"]])
+    original = relation.read_bytes()
+    client = Mock()
+    client.get.side_effect = urllib.error.HTTPError(
+        "https://rest.kegg.jp/get/hsa:missing", status, "failure", {}, None,
+    )
+    if status == 404:
+        kegg.reconcile_organism_catalogs(["hsa"], client, {})
+        evidence = json.loads((root / "missing_gene_checks.json").read_text())
+        assert evidence["hsa:missing"]["status"] == 404
+        assert evidence["hsa:missing"]["url"] == "https://rest.kegg.jp/get/hsa:missing"
+    else:
+        with pytest.raises(urllib.error.HTTPError):
+            kegg.reconcile_organism_catalogs(["hsa"], client, {})
+        assert not (root / "missing_gene_checks.json").exists()
+    assert original == relation.read_bytes()
+
+
+def test_kegg_reconciles_new_gene_ko_and_quarantines_verified_ec_orphan(tmp_path, monkeypatch):
+    generate(tmp_path)
+    root = tmp_path / "data/raw/kegg"
+    monkeypatch.setattr(kegg, "ROOT", root)
+    raw_tsv(root / "relations/hsa_gene_ko.tsv", [["hsa:demo1", "ko:K29269"]])
+    raw_tsv(root / "relations/ko_ec.tsv", [["ko:K10658", "ec:2.3.2.27"]])
+    client = Mock()
+    client.get.side_effect = urllib.error.HTTPError(
+        "https://rest.kegg.jp/get/K10658", 404, "missing", {}, None,
+    )
+
+    def refresh(endpoint, relative, **kwargs):
+        assert endpoint == "/list/ko" and kwargs["refresh"]
+        raw_tsv(root / relative, [["K00001", "Old KO"], ["K29269", "New KO"]])
+
+    monkeypatch.setattr(kegg, "fetch", refresh)
+    kegg.reconcile_ko_catalog(["hsa"], client, {})
+    evidence = json.loads((root / "missing_ko_checks.json").read_text())
+    assert evidence["K10658"]["status"] == 404
+    assert evidence["K10658"]["url"] == "https://rest.kegg.jp/get/K10658"
+    assert "K10658" in (root / "relations/ko_ec.tsv").read_text()
+    assert client.get.call_count == 1
+
+
+@pytest.mark.parametrize("failure", [403, 503, "timeout", "exists"])
+def test_kegg_never_records_network_failures_or_existing_kos_as_deleted(
+    tmp_path, monkeypatch, failure,
+):
+    generate(tmp_path)
+    root = tmp_path / "data/raw/kegg"
+    monkeypatch.setattr(kegg, "ROOT", root)
+    monkeypatch.setattr(kegg, "fetch", Mock())
+    raw_tsv(root / "relations/ko_ec.tsv", [["ko:K10658", "ec:2.3.2.27"]])
+    client = Mock()
+    if failure == "exists":
+        client.get.return_value = b"ENTRY       K10658 KO\nNAME        Existing\n///\n"
+        error = ValueError
+    elif failure == "timeout":
+        client.get.side_effect = TimeoutError("offline")
+        error = TimeoutError
+    else:
+        client.get.side_effect = urllib.error.HTTPError("url", failure, "failure", {}, None)
+        error = urllib.error.HTTPError
+    with pytest.raises(error):
+        kegg.reconcile_ko_catalog(["hsa"], client, {})
+    assert not (root / "missing_ko_checks.json").exists()
+
+
+def test_kegg_missing_gene_ko_is_never_quarantined(tmp_path, monkeypatch):
+    generate(tmp_path)
+    root = tmp_path / "data/raw/kegg"
+    monkeypatch.setattr(kegg, "ROOT", root)
+    monkeypatch.setattr(kegg, "fetch", Mock())
+    raw_tsv(root / "relations/hsa_gene_ko.tsv", [["hsa:demo1", "ko:K29269"]])
+    client = Mock()
+    with pytest.raises(ValueError, match="gene assignments still reference missing KOs"):
+        kegg.reconcile_ko_catalog(["hsa"], client, {})
+    client.get.assert_not_called()
 
 
 @pytest.mark.parametrize("damage", ["checksum", "structure", "request", "metadata"])
@@ -213,11 +364,11 @@ def test_uniprot_download_gzip_integrity_retry_and_cache(tmp_path, monkeypatch):
     network = Mock(side_effect=[io.BytesIO(payload[:-5]), io.BytesIO(payload)])
     monkeypatch.setattr(uniprot.urllib.request, "urlopen", network)
     destination = uniprot.RAW / "synthetic.tsv.gz"
-    uniprot.scarica("https://example.invalid/synthetic", destination, False)
+    uniprot.download("https://example.invalid/synthetic", destination, False)
     assert destination.read_bytes() == payload
     assert network.call_count == 2
     network.reset_mock()
-    uniprot.scarica("https://example.invalid/synthetic", destination, False)
+    uniprot.download("https://example.invalid/synthetic", destination, False)
     network.assert_not_called()
     metadata = json.loads((uniprot.RAW / "manifest.jsonl").read_text())
     assert metadata["sha256"] == sha256(destination)
@@ -226,6 +377,6 @@ def test_uniprot_download_gzip_integrity_retry_and_cache(tmp_path, monkeypatch):
 def test_uniprot_download_dry_run_does_not_create_files(tmp_path, monkeypatch):
     network = Mock()
     monkeypatch.setattr(uniprot.urllib.request, "urlopen", network)
-    uniprot.scarica("https://example.invalid/synthetic", tmp_path / "absent/test.gz", True)
+    uniprot.download("https://example.invalid/synthetic", tmp_path / "absent/test.gz", True)
     assert not list(tmp_path.iterdir())
     network.assert_not_called()

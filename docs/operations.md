@@ -1,6 +1,8 @@
 # Operations
 
-For a step-by-step walkthrough in Italian, including the complete CLI reference and worked examples, see the [command guide](guida-comandi.md).
+For installations with previous Italian table or TSV names, first follow the [English naming migration](english-names-migration.md).
+
+For complete native MySQL/Python and Docker startup paths, see the [English guide](command-guide.md) or [Italian guide](command-guide.it.md). Full options and acquisition examples are in the [command reference](command-reference.md) ([Italiano](command-reference.it.md)).
 
 ## Runtime contract
 
@@ -43,6 +45,28 @@ unikegg transform
 ```
 
 The [acquisition guide](acquisition.md) documents the 16-organism catalog, selection options, resumable pages, refresh and retry controls. Without selection options, all sixteen organisms are used as the default.
+
+If `transform` reports an unresolved KO in `relations/ko_ec.tsv`, rerun
+`unikegg download-kegg` with the same organism selection, then `unikegg transform`.
+Acquisition reuses verified downloads and refreshes the KO catalog when links
+reference absent KOs. Remaining KO/EC orphans are checked through KEGG GET;
+only HTTP 404 permits quarantine, recorded in `data/raw/kegg/missing_ko_checks.json`.
+Transformation emits a warning for each quarantined assertion and preserves the
+original raw relationship. Missing gene KO assignments, malformed links and network failures
+remain errors. If gene KOs remain missing after catalog refresh, retry acquisition
+with `--refresh` to obtain consistent source exports.
+
+Acquisition also checks selected organisms' gene relationships against their gene
+and pathway catalogs before downloading reaction/compound details. If a gene or
+pathway is missing, it refreshes the organism catalogs and any relationship files
+that still disagree. Verified detail batches are reused. Relationships that remain
+inconsistent after this targeted refresh stop acquisition before the detail phase.
+An exception applies to gene/pathway links: if the pathway is present and the absent
+gene is independently confirmed HTTP 404 by KEGG GET, acquisition records evidence
+in `missing_gene_checks.json`. Transformation warns and excludes those links while
+preserving raw files. Other HTTP errors and existing genes cannot justify exclusion.
+Transform errors distinguish missing genes
+from missing targets and identify the files to reconcile.
 
 Expected layout:
 

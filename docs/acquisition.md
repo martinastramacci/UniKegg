@@ -1,12 +1,16 @@
-# Download degli organismi modello
+# Download the model organisms
 
-Per il percorso completo dall'installazione al database, con il riferimento di tutti i comandi, vedere la [guida pratica passo per passo](guida-comandi.md).
+For installation, server startup and credentials, choose [Python and SQL without Docker](command-guide.md#a-python-and-sql-without-docker) or [Docker and SQL](command-guide.md#b-docker-and-sql). This page describes the individual operation in more detail.
 
-UniKegg supporta un catalogo curato di **16 organismi**, con proteine UniProtKB/Swiss-Prot (`reviewed:true`). Tutti i 16 organismi sono il default. `--all-organisms` seleziona tutti i 16 organismi del catalogo, non l'intero catalogo KEGG. Gli ID locali dei dieci organismi originali rimangono invariati.
+For installations with previous Italian table or TSV names, first follow the [English naming migration](english-names-migration.md).
 
-## Organismi disponibili
+[Italian copy](acquisition.it.md). For installation through database loading and the full CLI reference, see the [step-by-step command guide](command-guide.md).
 
-| Codice KEGG | Organismo / ceppo | Taxid nella query UniProt | Taxid KEGG | Selezione |
+UniKegg supports a curated catalog of **16 organisms**, restricted to UniProtKB/Swiss-Prot proteins (`reviewed:true`). All sixteen are selected by default. `--all-organisms` selects the curated catalog, not all KEGG genomes. Local IDs of the original ten organisms remain unchanged.
+
+## Available organisms
+
+| KEGG code | Organism / strain | UniProt query taxid | KEGG taxid | Selection |
 |---|---|---:|---:|---|
 | hsa | Homo sapiens | 9606 | 9606 | Default |
 | mmu | Mus musculus | 10090 | 10090 | Default |
@@ -18,83 +22,82 @@ UniKegg supporta un catalogo curato di **16 organismi**, con proteine UniProtKB/
 | sce | Saccharomyces cerevisiae S288c | 559292 | 559292 | Default |
 | eco | Escherichia coli K-12 | 83333 | 511145 | Default |
 | bsu | Bacillus subtilis 168 | 224308 | 224308 | Default |
-| spo | Schizosaccharomyces pombe 972h− | 284812 | 284812 | Aggiunto |
-| ddi | Dictyostelium discoideum | 44689 | 352472 | Aggiunto |
-| gga | Gallus gallus | 9031 | 9031 | Aggiunto |
-| xtr | Xenopus tropicalis | 8364 | 8364 | Aggiunto |
-| mtu | Mycobacterium tuberculosis H37Rv | 83332 | 83332 | Aggiunto |
-| pae | Pseudomonas aeruginosa PAO1 | 208964 | 208964 | Aggiunto |
+| spo | Schizosaccharomyces pombe 972h− | 284812 | 284812 | Added |
+| ddi | Dictyostelium discoideum | 44689 | 352472 | Added |
+| gga | Gallus gallus | 9031 | 9031 | Added |
+| xtr | Xenopus tropicalis | 8364 | 8364 | Added |
+| mtu | Mycobacterium tuberculosis H37Rv | 83332 | 83332 | Added |
+| pae | Pseudomonas aeruginosa PAO1 | 208964 | 208964 | Added |
 
-Il 30 settembre 2026 sono stati confrontati campioni di cinque proteine reviewed per ciascuno dei sei organismi aggiunti con `/conv/uniprot/{codice}`: tutti i cinque collegamenti per organismo coincidevano nelle due fonti. Il catalogo KEGG e le query UniProt dei dieci organismi originali sono stati verificati nell'audit precedente. Queste prove verificano la compatibilità del perimetro; non garantiscono che ogni gene abbia una proteina reviewed o che le annotazioni restino immutate.
+On 30 September 2026, samples of five reviewed proteins for each of the six added organisms were compared with `/conv/uniprot/{code}`. All five links per organism matched between sources. The original ten KEGG codes and UniProt queries were checked in the preceding audit. These checks establish scope compatibility; they do not guarantee that every gene has a reviewed protein or that annotations remain unchanged.
 
-Le differenze di taxid per `eco` e `ddi` sono intenzionali: il codice conserva esplicitamente entrambi gli identificativi, senza sostituire automaticamente il taxid della query UniProt con quello del genoma KEGG. Per `spo` si usa il ceppo 972h−: la query sul taxid generico 4896 non ha restituito proteine reviewed con collegamenti KEGG nella verifica. I 16 taxid UniProt selezionati sono distinti, quindi non è necessaria una migrazione dello schema SQL. L'estensione a ceppi con taxid condivisi richiederebbe una diversa modellazione.
+The taxid differences for `eco` and `ddi` are intentional. The catalog records both identifiers and does not automatically replace the UniProt query taxid with the KEGG genome taxid. `spo` uses strain 972h−: a query with generic taxid 4896 did not return reviewed proteins with KEGG links during verification. The sixteen selected UniProt taxids are distinct, so expanding the catalog did not require SQL schema migration. Supporting strains with shared taxids would require different modeling.
 
-## Comandi
+## Commands
 
-Dalla directory del progetto, dopo l'installazione del pacchetto:
+From the project directory after installing the package:
 
 ```bash
 unikegg list-organisms
 unikegg list-organisms --search pombe
 
-# Tutti i 16 organismi del catalogo curato (comportamento predefinito):
+# All 16 curated organisms (default):
 unikegg download-kegg
 unikegg download-uniprot
 unikegg transform
-
 unikegg validate
 
-# Una lista precisa:
+# A specific selection:
 unikegg download-kegg --organisms hsa,eco,spo
 unikegg download-uniprot --organisms hsa,eco,spo
 unikegg transform
 
-# I primi 12, nell'ordine della tabella:
+# First 12 in catalog order:
 unikegg download-kegg --limit 12 --dry-run
 unikegg download-uniprot --limit 12 --dry-run
 ```
 
-Le modalità `--organisms`, `--limit` e `--all-organisms` sono alternative. `--limit` accetta un intero da 1 a 16, senza ridurre silenziosamente un numero maggiore. Codici sconosciuti, vuoti o ripetuti sono rifiutati prima di scaricare. Il dry-run non accede alla rete e non crea file. Per KEGG mostra il numero esatto di richieste di base (86 per tutti i 16 organismi); i batch aggiuntivi dipendono dalle relazioni scaricate. UniProt mostra le query delle pagine; il numero complessivo di pagine è noto solo dopo la prima risposta di ciascuna query.
+`--organisms`, `--limit` and `--all-organisms` are mutually exclusive. `--limit` accepts 1–16 without silently clamping larger values. Unknown, empty or duplicate codes are rejected before downloading. Dry-run uses no network and creates no files. KEGG shows the exact base request count (88 for sixteen organisms); additional batches depend on downloaded relationships. UniProt shows page queries; the total page count is known after the first response for each query.
 
-`transform` legge la selezione completata di KEGG e richiede che UniProt la copra. Per trasformare solo una parte di fonti già scaricate:
+`transform` reads KEGG's completed selection and requires UniProt to cover it. To transform a subset of already downloaded sources:
 
 ```bash
 unikegg transform --organisms hsa,eco
 ```
 
-I manifest processed registrano i codici effettivi. `validate`, `load`, `update` e `verify` utilizzano quel perimetro; non accettano opzioni per cambiarlo. I vecchi manifest senza questo campo continuano a richiedere i dieci organismi originali. Per sincronizzare un database già caricato con il nuovo dataset usare `unikegg update`; `load` continua a rifiutare un fingerprint diverso. La sincronizzazione rimuove anche gli organismi esclusi dalla nuova selezione. Versione corrente e storico sono descritti nella [guida agli aggiornamenti](updates.md).
+Processed manifests record the actual codes. `validate`, `load`, `update` and `verify` use this scope and reject options that change it. Older manifests without that field retain the original ten-organism contract. Use `unikegg update` to synchronize an existing database with a new dataset; `load` rejects a different fingerprint. Synchronization also removes organisms excluded by the new selection. See [dataset updates](updates.md) for versions and history.
 
-## UniProt: singoli organismi, gruppi e blocchi automatici
+## UniProt: individual organisms, groups and automatic batches
 
-Tutti i comandi UniProt richiedono esclusivamente record `reviewed:true` e verificano lo stato reviewed nelle risposte. Ogni organismo conserva il proprio file TSV gzip con sequenze e annotazioni, anche quando viene scaricato in un blocco. Non serve che una proteina abbia un collegamento KEGG per essere inclusa nel download.
+Every UniProt command requests `reviewed:true` and verifies reviewed status in responses. Each organism retains its own gzip TSV of sequences and annotations, even when downloaded within a batch. Proteins do not need a KEGG link to be included.
 
 ```bash
-# Un organismo:
+# One organism:
 unikegg download-uniprot --organisms hsa
 
-# Un gruppo scelto manualmente:
+# A manually selected group:
 unikegg download-uniprot --organisms hsa,mmu,eco
 
-# Tutti i 16, in quattro blocchi consecutivi da quattro organismi:
+# All sixteen, in four sequential batches of four:
 unikegg download-uniprot --all-organisms --batch-size 4
 
-# Solo il secondo blocco (dme,cel,ath,sce), senza scaricare gli altri:
+# Only batch 2 (dme,cel,ath,sce):
 unikegg download-uniprot --all-organisms --batch-size 4 --batch 2
 
-# Anteprima dei blocchi, senza rete o scritture:
+# Preview without network or writes:
 unikegg download-uniprot --all-organisms --batch-size 4 --dry-run
 ```
 
-`--batch-size` accetta da 1 a 16 organismi; `--batch` richiede `--batch-size` ed è numerato da 1. I blocchi seguono l'ordine del catalogo e si applicano alla selezione indicata (`--all-organisms`, `--organisms` o `--limit`); senza selezione esplicita si usano tutti i 16 organismi predefiniti. L'ultimo blocco può contenere meno organismi. Senza `--batch` il comando esegue tutti i blocchi in sequenza. Il raggruppamento riguarda gli organismi; la paginazione HTTP resta di massimo 500 proteine per pagina.
+`--batch-size` accepts 1–16; `--batch` requires it and is numbered from 1. Batches follow catalog order within the selected scope. Without explicit selection, all sixteen default organisms are used. The final batch may be smaller. Omitting `--batch` executes every batch in sequence. Organism grouping does not change HTTP pagination, which remains at most 500 proteins per page.
 
-Per costruire progressivamente una selezione in più sessioni usare **`--append`**:
+Use **`--append`** to build a cumulative selection over several sessions:
 
 ```bash
-# Gruppi manuali: al termine la selezione disponibile è hsa,mmu,eco,spo.
+# Final selection: hsa,mmu,eco,spo.
 unikegg download-uniprot --organisms hsa,mmu
 unikegg download-uniprot --organisms eco,spo --append
 
-# In una directory dedicata, quattro sessioni per ottenere tutti i 16:
+# Four sessions for all sixteen, in a dedicated directory:
 export UNIKEGG_DATA_DIR="$PWD/data-uniprot-16"
 unikegg download-uniprot --all-organisms --batch-size 4 --batch 1 --append
 unikegg download-uniprot --all-organisms --batch-size 4 --batch 2 --append
@@ -102,34 +105,34 @@ unikegg download-uniprot --all-organisms --batch-size 4 --batch 3 --append
 unikegg download-uniprot --all-organisms --batch-size 4 --batch 4 --append
 ```
 
-`--append` unisce il gruppo richiesto alla selezione registrata nella stessa directory e ricontrolla i file precedenti, riutilizzando la cache verificata. Funziona anche per il primo gruppo. Gli organismi sovrapposti vengono inclusi una sola volta. Senza `--append`, il manifest continua a rappresentare solo la selezione dell'ultimo comando; gli altri file restano sul disco e possono essere riutilizzati con una successiva selezione più ampia.
+`--append` merges the requested group with the recorded selection in the same directory, rechecks previous files and reuses verified caches. It also works for the first group. Overlapping organisms appear once. Without `--append`, the manifest represents only the latest command's selection; other files remain on disk and can be reused by a broader selection later.
 
-In caso di interruzione, ripetere lo stesso comando (stessa selezione, blocco, `--append` e formato) **senza `--refresh`** prima di aggiungere un altro gruppo. La selezione cumulativa resta incompleta fino alla conclusione della ripresa. Release diverse tra i gruppi vengono rifiutate: ripetere il comando con `--append --refresh` aggiorna **l'intera selezione cumulativa**, compresi gli organismi precedenti. Anche `--include-json` si applica all'intera selezione cumulativa. Per passare a una selezione differente dopo un'interruzione, eseguire un comando senza `--append`; per aggiornare tutti i sedici usare `--all-organisms --refresh`.
+After interruption, repeat the same command (selection, batch, `--append`, format) **without `--refresh`** before adding another group. The cumulative selection stays incomplete until resumption finishes. Groups with different releases are rejected. Repeating with `--append --refresh` refreshes **the entire cumulative selection**, including earlier organisms. `--include-json` likewise applies to the entire cumulative selection. To change selection after interruption, run without `--append`; to refresh all sixteen use `--all-organisms --refresh`.
 
-Le opzioni `--batch-size`, `--batch` e `--append` sono specifiche di `download-uniprot`. Per la trasformazione integrata serve anche la corrispondente acquisizione KEGG, ad esempio `unikegg download-kegg --all-organisms` nella stessa directory dati; poi eseguire `unikegg transform`.
+`--batch-size`, `--batch` and `--append` apply only to `download-uniprot`. Integrated transformation also needs matching KEGG acquisition, for example `unikegg download-kegg --all-organisms` in the same data directory, followed by `unikegg transform`.
 
-## Interruzioni, cache e aggiornamento
+## Interruptions, caches and refresh
 
-Entrambi i client usano una pausa predefinita di un secondo per richiesta, fino a quattro tentativi e un limite minimo configurabile di 0,34 secondi. I processi dello stesso utente che condividono la directory temporanea coordinano le chiamate allo stesso host; processi su altre macchine/utenti che condividono l'IP non sono coordinabili da questo programma. HTTP 429, 408, 500, 502, 503 e 504 ammettono tentativi successivi. Le attese crescono e rispettano `Retry-After`, sia numerico sia come data HTTP. Il cooldown del server persiste anche se si esaurisce l'ultimo tentativo. Errori permanenti, come HTTP 400/404, falliscono subito.
+Both clients default to one second between requests, up to four attempts and a configurable minimum interval of 0.34 seconds. Same-user processes sharing the temporary directory coordinate calls to each host. Processes on other machines or users sharing an IP cannot be coordinated by this program. HTTP 429, 408, 500, 502, 503 and 504 are retried with increasing delays and respect numeric or HTTP-date `Retry-After`. Server cooldown persists after the last attempt fails. Permanent errors such as HTTP 400/404 fail immediately, except independently recorded 404 checks used for the explicit quarantine rules below.
 
 ```bash
 unikegg download-kegg --all-organisms --interval 1.5 --attempts 8
 unikegg download-uniprot --all-organisms --interval 1.5 --attempts 8
 ```
 
-Se un lavoro si interrompe, rilanciare lo stesso comando **senza `--refresh`**. I file completati sono riutilizzati solo dopo verifica di richiesta, checksum e contenuto. UniProt conserva l'identità del refresh interrotto: riprende le nuove pagine già salvate, anche quando esiste ancora il vecchio archivio, e aggiorna gli export non ancora raggiunti. Il JSON facoltativo riparte dall'inizio del singolo file. Una selezione incompleta non può essere trasformata. I lock sull'acquisizione sono liberati dal sistema operativo alla chiusura del processo; il file del lock può restare sul disco. Una trasformazione di fonti gestite non parte mentre un downloader le sta modificando.
+Resume interrupted work with the same command **without `--refresh`**. Completed files are reused only after request, checksum and content validation. UniProt retains interrupted refresh identity: it resumes saved new pages even if an older export still exists and refreshes exports not yet reached. Optional JSON restarts from the beginning of its file. Incomplete selections cannot be transformed. Operating-system locks are released when a process exits; lock files may remain. Managed sources cannot be transformed while a downloader modifies them.
 
-UniProt TSV usa `/search` con pagine fino a 500 proteine, ordinamento stabile per accession e checkpoint in `raw/uniprot/.pages/`. Ogni pagina conserva checksum e URL; una pagina danneggiata invalida solo quella parte del checkpoint e le successive. Colonne, organismi, stato reviewed, accession duplicate, totale e release sono verificati prima di pubblicare il gzip finale. Una release cambiata durante l'acquisizione richiede un aggiornamento completo, evitando di mescolare le release tra pagine o organismi.
+UniProt TSV uses `/search`, stable accession ordering, pages of at most 500 proteins and checkpoints in `raw/uniprot/.pages/`. Each page records its checksum and URL; a damaged page invalidates itself and subsequent checkpoints. Columns, organisms, reviewed status, duplicate accessions, total count and release are verified before publishing the final gzip. A release change during acquisition requires a full refresh to avoid mixing releases across pages or organisms.
 
-Il JSON UniProt è facoltativo:
+Optional UniProt JSON:
 
 ```bash
 unikegg download-uniprot --organisms hsa,spo --include-json
 ```
 
-Il JSON usa lo stream originale e, in caso di interruzione del singolo file, riparte dall'inizio; la trasformazione legge soltanto il TSV. La modalità predefinita evita di scaricare il JSON inutilizzato.
+JSON uses the original stream and restarts a failed file from its beginning. Transformation reads only TSV; the default avoids downloading unused JSON.
 
-Per acquisire dati nuovi, è preferibile usare una nuova directory:
+A separate directory is preferable for new data:
 
 ```bash
 export UNIKEGG_DATA_DIR="$PWD/data-snapshot-2026-09"
@@ -138,22 +141,24 @@ unikegg download-uniprot --all-organisms
 unikegg transform
 ```
 
-In alternativa `--refresh` aggiorna i file nella directory attuale e ricomincia i checkpoint UniProt. Finché l'acquisizione non termina, il relativo stato resta incompleto. I file finali precedenti sono preservati quando il nuovo trasferimento del singolo file fallisce. Un gzip valido ma senza provenienza verificabile viene acquisito nuovamente. La cache verificata non è una verifica di freschezza sul server.
+Alternatively, `--refresh` updates files in the current directory and restarts UniProt checkpoints. Acquisition remains incomplete until finished. Previous final files are preserved if their replacement transfer fails. A valid gzip without verifiable provenance is downloaded again. Verified cache reuse is not a server freshness check.
 
-KEGG conserva i batch scaricati sotto `raw/kegg/batches/`, poi produce record per identificatore con un indice `details/{categoria}/active.json`. Solo i record attivi sono letti dalla trasformazione; batch vecchi sovrapposti non generano duplicati e una selezione più piccola non reintroduce dettagli precedenti. Gli export manuali legacy senza indice restano leggibili con i controlli originali sui duplicati.
+KEGG retains downloaded batches under `raw/kegg/batches/`, then writes identifier-specific records with `details/{category}/active.json`. Transformation reads only active records, preventing duplicate older overlapping batches and preventing smaller selections from reintroducing old details. Legacy manual exports without an index retain their original duplicate checks.
 
-## Memoria, disco e verifica
+## Memory, disk and validation
 
-Geni e proteine vengono scritti progressivamente; le principali relazioni vengono deduplicate e ordinate in un database SQLite temporaneo, con cache limitata, evitando più copie in memoria. Gli indici di validazione e appartenenza rimangono in RAM: il consumo non è costante rispetto al numero di record. L'obiettivo è il catalogo curato, non un import di tutti i genomi KEGG.
+Genes and proteins are written incrementally. Major relationships are deduplicated and sorted in a temporary SQLite database with bounded cache, avoiding multiple in-memory copies. Validation and membership indexes remain in RAM, so memory use is not constant with record count. The target is the curated catalog, not every KEGG genome.
 
-`TMPDIR` controlla la directory di lavoro temporanea. Nell'immagine Docker è `/app/tmp`, montata dal volume su disco `etl_tmp`; i grandi snapshot non consumano il tmpfs `/tmp`. Checkpoint e batch raw restano disponibili per la ripresa e consumano spazio anche dopo il completamento; non sono cancellati automaticamente. Usare directory separate per conservare o archiviare gli snapshot.
+`TMPDIR` controls temporary storage. In Docker it is `/app/tmp`, mounted through the on-disk `etl_tmp` volume; large snapshots do not consume `/tmp` tmpfs. Raw checkpoints and batches remain available for resumption and consume space after completion; they are not deleted automatically. Use separate directories to retain or archive snapshots.
 
-I test offline verificano selezioni di 1/2/16 organismi, pipeline ripetuta, risposta reviewed vuota, retry e cooldown, lock concorrenti, pagine interrotte/danneggiate, cambio di release, conteggi errati, cache e dettagli KEGG. Le prove live sui client aggiornati hanno verificato due pagine UniProt effettive, un batch KEGG e il successivo riuso della cache senza rete. Non è stato scaricato l'intero dataset dei 16 organismi.
+Offline tests cover selections of 1/2/16 organisms, repeated pipelines, empty reviewed responses, retries and cooldowns, concurrent locks, interrupted/damaged pages, release changes, incorrect counts, caches and KEGG details. Recorded live client checks covered two actual UniProt pages, one KEGG batch and subsequent offline cache reuse; these checks did not download the entire sixteen-organism dataset.
 
-I test dei blocchi UniProt coprono inoltre tutti i 16 organismi in una singola esecuzione o in sessioni cumulative, blocchi incompleti nell'ultima posizione, gruppi manuali, JSON facoltativo, opzioni non valide, dry-run senza modifiche, ripresa delle aggiunte interrotte e aggiornamento delle release nei gruppi precedenti. Queste verifiche usano risposte HTTP simulate e non scaricano dati biologici.
+UniProt batch tests also cover all sixteen organisms in one run or cumulative sessions, smaller final batches, manual groups, optional JSON, invalid options, dry-run without changes, resumption of interrupted additions and release refreshes of earlier groups. These use simulated HTTP responses without downloading biological data.
 
-Fonti: [KEGG API e limite delle richieste](https://www.kegg.jp/kegg/rest/), [manuale KEGG](https://www.kegg.jp/kegg/rest/keggapi.html), [API UniProt, paginazione e stream](https://academic.oup.com/nar/article/53/W1/W547/8126256).
+Sources: [KEGG API and rate limits](https://www.kegg.jp/kegg/rest/), [KEGG API manual](https://www.kegg.jp/kegg/rest/keggapi.html), [UniProt API, pagination and streaming](https://academic.oup.com/nar/article/53/W1/W547/8126256).
 
-## Collegamenti diretti KO, pathway ed EC
+## Direct KO, pathway and EC links
 
-`download-kegg` acquisisce anche `/link/pathway/ko` e `/link/enzyme/ko`, salvando `relations/ko_pathway.tsv` e `relations/ko_ec.tsv`. Sono relazioni globali, come i cataloghi KO e reference pathway, indipendenti dalla selezione degli organismi. La cache verificata, i checksum e i tentativi HTTP si applicano anche a questi file. `transform` richiede entrambi i raw, normalizza gli identificatori e produce `ortologia_pathway.tsv` e `ortologia_ec.tsv`; un raw mancante o incoerente blocca la pubblicazione. Per snapshot precedenti, seguire la [procedura di migrazione](orthology-migration.md).
+`download-kegg` also acquires `/link/pathway/ko` and `/link/enzyme/ko`, saving `relations/ko_pathway.tsv` and `relations/ko_ec.tsv`. These global relationships, like KO and reference pathway catalogs, are independent of organism selection. Verified caching, checksums and HTTP retries also apply to them. `transform` requires both files, normalizes identifiers and produces `orthology_pathway.tsv` and `orthology_ec.tsv`. Missing or inconsistent raw sources prevent publication. See the [migration procedure](orthology-migration.md) for older snapshots.
+
+Before detail batches, acquisition reconciles missing gene/pathway catalog entries and refreshes relationship files that still disagree. It also refreshes KO catalogs referenced by missing IDs. Remaining KO–EC or gene–pathway assertions may be quarantined only when the absent KO or gene is independently confirmed HTTP 404. Evidence is stored in `missing_ko_checks.json` or `missing_gene_checks.json`; transformation warns and preserves the raw assertions. Other failures remain errors. See [operations](operations.md).

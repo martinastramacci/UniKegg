@@ -19,8 +19,10 @@ from unittest.mock import patch
 import mysql.connector
 
 from tests.make_fixture import generate
+from tools.migrate_database_names import run as migrate_database_names
 from unikegg import loader
 from unikegg.dataset import BY_NAME, TABLES, manifest, rows
+from unikegg.legacy_names import LEGACY_TABLE_NAMES
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -58,7 +60,7 @@ def initialize():
             for path in sorted((ROOT / "db/init").glob("*.sql")):
                 for sql in statements(path):
                     # Upgrade the old domain schema; Compose tests fresh DDL.
-                    if not re.search(r"CREATE TABLE ORTOLOGIA_(PATHWAY|EC)\b", sql):
+                    if not re.search(r"CREATE TABLE ORTHOLOGY_(PATHWAY|EC)\b", sql):
                         cursor.execute(sql)
             migration = ROOT / "db/migrations/004_orthology_links.sql"
             for sql in statements(migration):
@@ -79,6 +81,37 @@ def expect_error(call, kind):
     except kind as error:
         return error
     raise AssertionError(f"Expected {kind.__name__}")
+
+
+def check_english_name_migration():
+    """Rename populated CI tables to legacy names, then migrate them back."""
+    before = {
+        table["name"]: query(f"SELECT * FROM `{table['name']}` ORDER BY "
+                             + ",".join(f"`{key}`" for key in table["pk"]))
+        for table in TABLES
+    }
+    metadata = query("SELECT * FROM ETL_LOAD_STATE")
+    history = query("SELECT * FROM ETL_DATASET_HISTORY")
+    connection = loader.connect()
+    try:
+        cursor = connection.cursor()
+        try:
+            cursor.execute("RENAME TABLE " + ", ".join(
+                f"`{new}` TO `{old}`" for old, new in LEGACY_TABLE_NAMES.items()
+            ))
+        finally:
+            cursor.close()
+    finally:
+        connection.close()
+    assert len(migrate_database_names(apply=True)) == len(LEGACY_TABLE_NAMES)
+    assert migrate_database_names(apply=True) == []
+    for table in TABLES:
+        assert query(f"SELECT * FROM `{table['name']}` ORDER BY "
+                     + ",".join(f"`{key}`" for key in table["pk"])) == before[table["name"]]
+    assert query("SELECT * FROM ETL_LOAD_STATE") == metadata
+    assert query("SELECT * FROM ETL_DATASET_HISTORY") == history
+    assert loader.run(verify_only=True)["action"] == "verified"
+    print("English table migration preserved all fields, foreign keys and version history.")
 
 
 def typed(table, column, value):
@@ -129,26 +162,26 @@ def check_orthology_constraints():
     cursor = connection.cursor()
     try:
         for statement, errno in [
-            ("INSERT INTO ORTOLOGIA_PATHWAY VALUES ('K99999','map00010')", 1452),
-            ("INSERT INTO ORTOLOGIA_PATHWAY VALUES ('K00001','map99999')", 1452),
-            ("INSERT INTO ORTOLOGIA_EC VALUES ('K99999','1.1.1.1')", 1452),
-            ("INSERT INTO ORTOLOGIA_EC VALUES ('K00001','9.9.9.9')", 1452),
-            ("INSERT INTO ORTOLOGIA_PATHWAY VALUES ('K00001','map00010')", 1062),
-            ("INSERT INTO ORTOLOGIA_EC VALUES ('K00001','1.1.1.1')", 1062),
+            ("INSERT INTO ORTHOLOGY_PATHWAY VALUES ('K99999','map00010')", 1452),
+            ("INSERT INTO ORTHOLOGY_PATHWAY VALUES ('K00001','map99999')", 1452),
+            ("INSERT INTO ORTHOLOGY_EC VALUES ('K99999','1.1.1.1')", 1452),
+            ("INSERT INTO ORTHOLOGY_EC VALUES ('K00001','9.9.9.9')", 1452),
+            ("INSERT INTO ORTHOLOGY_PATHWAY VALUES ('K00001','map00010')", 1062),
+            ("INSERT INTO ORTHOLOGY_EC VALUES ('K00001','1.1.1.1')", 1062),
         ]:
             error = expect_error(lambda: cursor.execute(statement), mysql.connector.Error)
             assert error.errno == errno, error
-        cursor.execute("INSERT INTO ORTOLOGIA_KEGG VALUES ('K99998', NULL, NULL)")
-        cursor.execute("INSERT INTO ORTOLOGIA_PATHWAY VALUES ('K99998','map00010')")
+        cursor.execute("INSERT INTO ORTHOLOGY_KEGG VALUES ('K99998', NULL, NULL)")
+        cursor.execute("INSERT INTO ORTHOLOGY_PATHWAY VALUES ('K99998','map00010')")
         error = expect_error(
-            lambda: cursor.execute("DELETE FROM ORTOLOGIA_KEGG WHERE ko_id='K99998'"),
+            lambda: cursor.execute("DELETE FROM ORTHOLOGY_KEGG WHERE ko_id='K99998'"),
             mysql.connector.Error,
         )
         assert error.errno == 1451
-        cursor.execute("DELETE FROM ORTOLOGIA_PATHWAY WHERE ko_id='K99998'")
-        cursor.execute("INSERT INTO ORTOLOGIA_EC VALUES ('K99998','1.1.1.1')")
+        cursor.execute("DELETE FROM ORTHOLOGY_PATHWAY WHERE ko_id='K99998'")
+        cursor.execute("INSERT INTO ORTHOLOGY_EC VALUES ('K99998','1.1.1.1')")
         error = expect_error(
-            lambda: cursor.execute("UPDATE ORTOLOGIA_KEGG SET ko_id='K99997' WHERE ko_id='K99998'"),
+            lambda: cursor.execute("UPDATE ORTHOLOGY_KEGG SET ko_id='K99997' WHERE ko_id='K99998'"),
             mysql.connector.Error,
         )
         assert error.errno == 1451
@@ -199,6 +232,7 @@ def run():
         assert sorted(result["action"] for result in results) == ["loaded", "verified"]
         assert loader.run(verify_only=True)["action"] == "verified"
         assert loader.run()["action"] == "verified"
+        check_english_name_migration()
         check_orthology_constraints()
         for table in TABLES:
             columns = ",".join(f"`{c}`" for c in table["columns"])

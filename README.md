@@ -1,6 +1,8 @@
 # UniKegg
 
-**Guida pratica in italiano:** [tutti i comandi, procedure passo per passo ed esempi](docs/guida-comandi.md), dall'installazione ai download dei 16 organismi, fino a caricamento, aggiornamento e risoluzione degli errori.
+For installations with previous Italian table or TSV names, first follow the [English naming migration](docs/english-names-migration.md).
+
+**Startup guides:** [English](docs/command-guide.md) · [Italiano](docs/command-guide.it.md). Choose a complete **Python + native MySQL + SQL** path or a **Docker + SQL** path, with explanations of every setup step. See the [command reference](docs/command-reference.md) ([Italiano](docs/command-reference.it.md)) for all CLI options and acquisition examples.
 
 ## Overview & Engineering Objective
 
@@ -69,13 +71,17 @@ flowchart LR
     M --> Q[Integrated SQL queries]
 ```
 
-The schema separates biological entities from many-to-many associations. `GENE_PROTEINA` is the principal KEGG/Swiss-Prot integration bridge and retains mapping provenance (`KEGG_CONV` or `UNIPROT_DR`). Reference pathways are distinct from organism-specific pathways. GO terms and EC identifiers are deduplicated dimensions. Isoforms reference canonical protein accessions. The existing SQL identifiers are preserved for compatibility; see the [logical schema and ER diagram](docs/schema.md).
+The schema separates biological entities from many-to-many associations. `GENE_PROTEIN` is the principal KEGG/Swiss-Prot integration bridge and retains mapping provenance (`KEGG_CONV` or `UNIPROT_DR`). Reference pathways are distinct from organism-specific pathways. GO terms and EC identifiers are deduplicated dimensions. Isoforms reference canonical protein accessions. The existing SQL identifiers are preserved for compatibility; see the [logical schema and ER diagram](docs/schema.md).
 
-The database now supports direct many-to-many mappings between enzymes (EC), orthology groups (KO) and reference pathways through `ORTOLOGIA_EC` and `ORTOLOGIA_PATHWAY`. These preserve explicit KEGG assertions, including EC identifiers found only in KO links; they enable `Gene → KO → Pathway` and `EC → KO → Pathway` queries. The current contract contains **22 domain tables and 22 TSVs**. Existing 20-table snapshots and databases require the [KO migration and regeneration procedure](docs/orthology-migration.md).
+The database now supports direct many-to-many mappings between enzymes (EC), orthology groups (KO) and reference pathways through `ORTHOLOGY_EC` and `ORTHOLOGY_PATHWAY`. These preserve explicit KEGG assertions, including EC identifiers found only in KO links; they enable `Gene → KO → Pathway` and `EC → KO → Pathway` queries. The current contract contains **22 domain tables and 22 TSVs**. Existing 20-table snapshots and databases require the [KO migration and regeneration procedure](docs/orthology-migration.md).
 
 Two infrastructure tables record dataset versions: `ETL_LOAD_STATE` stores the committed fingerprint and `current_version`; `ETL_DATASET_HISTORY` stores previous versions, UTC dates, labels and change counts. They are outside the biological domain schema. Foreign-key checks remain enabled. The loader rejects MySQL warnings and rolls back uncommitted data on failure. A repeat load of the same manifest verifies the existing database; a different manifest or an unexplained nonempty database is rejected instead of overwritten.
 
 TSVs use UTF-8, tab separators, LF line endings and doubled internal quotes. New exports quote every field. Legacy bundles with optional enclosure remain supported: the loader validates a private snapshot and rewrites that transport copy with full enclosure before SQL, preserving the literal string `NULL`. Empty values become SQL `NULL` only in nullable fields; backslashes are not escape characters. Canonical sequences use `MEDIUMTEXT` and must match their declared lengths. Validation also checks secondary unique keys, integer and decimal ranges, text byte limits and the configured SQL domains. Biological keys and references must be printable, non-space ASCII; free-text annotations remain UTF-8.
+
+## Native MySQL setup (without Docker)
+
+Docker is optional. The [native startup guide](docs/command-guide.md#a-python-and-sql-without-docker) ([Italiano](docs/command-guide.it.md#a-python-e-sql-senza-docker)) covers installing and starting MySQL, creating the database and application account, enabling `local_infile`, importing the three schema files, configuring the Python connection, acquiring/loading data and running SQL queries. Local Python does not start MySQL or create the schema automatically. Use port `3306` for the documented native server; the CLI defaults to `3307`, so export the native port explicitly.
 
 ## Infrastructure Setup (Docker Compose)
 
@@ -145,16 +151,16 @@ docker compose exec mysql mysql -uunikegg -p UniKegg
 Enter the configured application password at the prompt. Execute:
 
 ```sql
-SELECT COUNT(*) AS organisms FROM ORGANISMO;
+SELECT COUNT(*) AS organisms FROM ORGANISM;
 SELECT COUNT(*) AS reviewed_proteins FROM PROTEIN_UNIPROT;
 SELECT COUNT(*) AS invalid_sequences
 FROM PROTEIN_UNIPROT
 WHERE CHAR_LENGTH(amino_acid_sequence) <> sequence_length;
 
 SELECT o.kegg_code, COUNT(DISTINCT gp.accession) AS mapped_reviewed_proteins
-FROM ORGANISMO AS o
+FROM ORGANISM AS o
 INNER JOIN GENE_KEGG AS g ON g.organism_id = o.organism_id
-INNER JOIN GENE_PROTEINA AS gp ON gp.kegg_gene_id = g.kegg_gene_id
+INNER JOIN GENE_PROTEIN AS gp ON gp.kegg_gene_id = g.kegg_gene_id
 INNER JOIN PROTEIN_UNIPROT AS p ON p.accession = gp.accession
 GROUP BY o.kegg_code
 ORDER BY o.kegg_code;

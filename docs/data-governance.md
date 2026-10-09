@@ -1,5 +1,7 @@
 # Data governance
 
+For installations with previous Italian table or TSV names, first follow the [English naming migration](english-names-migration.md).
+
 ## Selection and provenance
 
 The protein scope is UniProtKB/Swiss-Prot, never UniProtKB/TrEMBL. Requests include `reviewed:true`, exported rows must report `Reviewed=reviewed`, and processed protein accessions must belong to the verified export. The existing biological identifiers are preserved. Organism membership is checked across gene-to-protein and gene-to-pathway bridges. Gene/protein mappings outside the selected protein scope are excluded and reported in local artifacts. Missing KEGG files, malformed or truncated records, unresolved KEGG source endpoints and missing selected reaction/compound details are errors, not silent scope exclusions. Without authoritative source metadata, the program cannot infer upstream records that are absent from every supplied input.
@@ -10,11 +12,11 @@ An accession match validates dataset selection, not sequence identity against ev
 
 ## Relational semantics
 
-`GENE_PROTEINA.mapping_source` distinguishes KEGG conversion mappings from UniProt cross-references. Two rows for the same gene/protein pair can represent two source assertions, not two distinct proteins. Count distinct pairs or accessions when that is the analytical intent.
+`GENE_PROTEIN.mapping_source` distinguishes KEGG conversion mappings from UniProt cross-references. Two rows for the same gene/protein pair can represent two source assertions, not two distinct proteins. Count distinct pairs or accessions when that is the analytical intent.
 
 Complete, incomplete and preliminary EC identifiers (including a fourth component such as `n3`) are preserved. Queries explicitly selecting complete ECs require four numeric components; preliminary identifiers are not treated as complete enzyme assignments. KEGG annotations, GO evidence and EC assignments are integrated associations. A shared EC number or pathway assignment does not establish reaction direction, flux or experimental activity. Isoform metadata does not imply that all isoform sequences are stored: canonical sequences reside in `PROTEIN_UNIPROT`; isoform records describe identifiers and sequence status.
 
-The preserved `PROTEINA_GO` grain is one accession/GO pair with one evidence-code/source representation. The current schema does not retain an arbitrary history of competing evidence assertions. Temporal versioning, source-release reconciliation and evidence multiplicity require explicit schema extensions.
+The preserved `PROTEIN_GO` grain is one accession/GO pair with one evidence-code/source representation. The current schema does not retain an arbitrary history of competing evidence assertions. Temporal versioning, source-release reconciliation and evidence multiplicity require explicit schema extensions.
 
 ## Distribution boundaries
 

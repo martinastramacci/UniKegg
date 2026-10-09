@@ -1,5 +1,32 @@
 # Local verification record
 
+For installations with previous Italian table or TSV names, first follow the [English naming migration](english-names-migration.md).
+
+## Main-project patch verification — 2026-10-08
+
+Applied `prova_unikegg/artifacts/main-project-english.patch` to the main
+UniKegg checkout. The local editable installation resolves to this checkout.
+All 280 unit/regression tests, Ruff 0.12.9, SQLFluff 4.3.0, the 29 ingestion
+projections and `git diff --check` passed. SQLFluff required an indentation
+correction in `005_english_names.sql`.
+
+The complete native MySQL 8.4.11 integration and update regressions passed
+on an isolated temporary server using a Unix socket without a TCP listener.
+These include English table migration, round trips, rollback, concurrency
+and the integration queries. The run exposed an unread result from
+`RELEASE_LOCK` in `migrate_database_names.py`; consuming that result before
+closing the cursor fixed the failure, and the full regressions then passed.
+Docker MySQL 8.0.44 was not exercised.
+
+The supplied legacy dump was also migrated to
+`artifacts/legacy-dump-english-2026-10-08-verified/`: 2,006,370 original rows
+were preserved and the English export contains 2,066,856 rows in 22 tables.
+Both integrity audits returned zero failures, and a second empty database
+restore matched every exported value. The package includes the October 5
+raw evidence, migration report, English/Italian instructions and checksums.
+The existing database was not changed; the resulting standalone dump has
+no fabricated Swiss-Prot ETL manifest.
+
 ## Migration of the supplied legacy dump — 2026-10-05
 
 The supplied 20-table dump contained 2,006,370 rows, 10 organisms, 89,601

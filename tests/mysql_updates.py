@@ -69,11 +69,11 @@ def run(directory, original):
     data["GENE_KEGG"][0]["definition"] = "SYNTHETIC GENE"
     # Change a KO parent (dependent bridges must be removed/reinserted),
     # replace a direct EC assertion and add a pathway assertion.
-    data["ORTOLOGIA_KEGG"][0]["definition"] = "Updated KO definition"
-    data["PATHWAY_RIFERIMENTO"].append({"map_id": "map00020", "name": "New map"})
-    data["ORTOLOGIA_PATHWAY"].append({"ko_id": "K00001", "map_id": "map00020"})
-    data["NUMERO_EC"].append({"ec_number": "2.7.1.999"})
-    data["ORTOLOGIA_EC"] = [{"ko_id": "K00001", "ec_number": "2.7.1.999"}]
+    data["ORTHOLOGY_KEGG"][0]["definition"] = "Updated KO definition"
+    data["PATHWAY_REFERENCE"].append({"map_id": "map00020", "name": "New map"})
+    data["ORTHOLOGY_PATHWAY"].append({"ko_id": "K00001", "map_id": "map00020"})
+    data["EC_NUMBER"].append({"ec_number": "2.7.1.999"})
+    data["ORTHOLOGY_EC"] = [{"ko_id": "K00001", "ec_number": "2.7.1.999"}]
     removed_protein = proteins[-1]["accession"]
     removed_gene = data["GENE_KEGG"][-1]["kegg_gene_id"]
     for table in TABLES:
@@ -90,7 +90,7 @@ def run(directory, original):
     gene = dict(data["GENE_KEGG"][0])
     gene["kegg_gene_id"] = gene["kegg_gene_id"].split(":")[0] + ":new"
     data["GENE_KEGG"].append(gene)
-    data["GENE_PROTEINA"].append(
+    data["GENE_PROTEIN"].append(
         {
             "kegg_gene_id": gene["kegg_gene_id"],
             "accession": "NEW000001",
@@ -103,8 +103,8 @@ def run(directory, original):
     assert plan["action"] == "planned"
     assert plan["changes"]["PROTEIN_UNIPROT"] == {"added": 1, "removed": 1, "modified": 2}
     assert plan["changes"]["GENE_KEGG"] == {"added": 1, "removed": 1, "modified": 1}
-    assert plan["changes"]["ORTOLOGIA_PATHWAY"] == {"added": 1, "removed": 0, "modified": 0}
-    assert plan["changes"]["ORTOLOGIA_EC"] == {"added": 1, "removed": 1, "modified": 0}
+    assert plan["changes"]["ORTHOLOGY_PATHWAY"] == {"added": 1, "removed": 0, "modified": 0}
+    assert plan["changes"]["ORTHOLOGY_EC"] == {"added": 1, "removed": 1, "modified": 0}
     assert database() == before
     assert query("SELECT * FROM ETL_LOAD_STATE") == old_state
     assert len(versions.run()["versions"]) == 1
@@ -174,7 +174,7 @@ def run(directory, original):
     sql("ALTER TABLE ETL_LOAD_STATE DROP COLUMN current_version")
     assert versions.run()["versions"][0]["action"] == "baseline"
     data["PROTEIN_UNIPROT"][0]["protein_name"] = "Next release"
-    data["ORGANISMO"][0]["scientific_name"] += " updated annotation"
+    data["ORGANISM"][0]["scientific_name"] += " updated annotation"
     write(data)
     updater.run(dry_run=True)
     assert (
@@ -195,7 +195,7 @@ def run(directory, original):
     assert entries[1]["applied_at"] == versions.utc(baseline[2])
     assert database() == expected(data)
     # A smaller selection removes organisms and all their dependent records.
-    data["ORGANISMO"].pop()
+    data["ORGANISM"].pop()
     for table in TABLES:
         for fk in table["fk"]:
             parents = {r[fk["target"]] for r in data[fk["parent"]]}

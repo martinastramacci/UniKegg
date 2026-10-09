@@ -1,7 +1,7 @@
 [
   {
-    "name": "ORGANISMO",
-    "file": "organismo.tsv",
+    "name": "ORGANISM",
+    "file": "organism.tsv",
     "columns": [
       "organism_id",
       "kegg_code",
@@ -35,8 +35,8 @@
     }
   },
   {
-    "name": "ORTOLOGIA_KEGG",
-    "file": "ortologia_kegg.tsv",
+    "name": "ORTHOLOGY_KEGG",
+    "file": "orthology_kegg.tsv",
     "columns": [
       "ko_id",
       "name",
@@ -57,8 +57,8 @@
     }
   },
   {
-    "name": "PATHWAY_RIFERIMENTO",
-    "file": "pathway_riferimento.tsv",
+    "name": "PATHWAY_REFERENCE",
+    "file": "pathway_reference.tsv",
     "columns": [
       "map_id",
       "name"
@@ -74,8 +74,8 @@
     }
   },
   {
-    "name": "REAZIONE_KEGG",
-    "file": "reazione_kegg.tsv",
+    "name": "REACTION_KEGG",
+    "file": "reaction_kegg.tsv",
     "columns": [
       "reaction_id",
       "name",
@@ -99,8 +99,8 @@
     }
   },
   {
-    "name": "COMPOSTO_KEGG",
-    "file": "composto_kegg.tsv",
+    "name": "COMPOUND_KEGG",
+    "file": "compound_kegg.tsv",
     "columns": [
       "compound_id",
       "name",
@@ -126,8 +126,8 @@
     }
   },
   {
-    "name": "TERMINE_GO",
-    "file": "termine_go.tsv",
+    "name": "GO_TERM",
+    "file": "go_term.tsv",
     "columns": [
       "go_id",
       "name",
@@ -145,8 +145,8 @@
     }
   },
   {
-    "name": "NUMERO_EC",
-    "file": "numero_ec.tsv",
+    "name": "EC_NUMBER",
+    "file": "ec_number.tsv",
     "columns": [
       "ec_number"
     ],
@@ -179,7 +179,7 @@
     "fk": [
       {
         "column": "organism_id",
-        "parent": "ORGANISMO",
+        "parent": "ORGANISM",
         "target": "organism_id"
       }
     ],
@@ -214,7 +214,7 @@
     "fk": [
       {
         "column": "organism_id",
-        "parent": "ORGANISMO",
+        "parent": "ORGANISM",
         "target": "organism_id"
       }
     ],
@@ -240,8 +240,8 @@
     }
   },
   {
-    "name": "PATHWAY_ORGANISMO",
-    "file": "pathway_organismo.tsv",
+    "name": "PATHWAY_ORGANISM",
+    "file": "pathway_organism.tsv",
     "columns": [
       "pathway_id",
       "organism_id",
@@ -254,12 +254,12 @@
     "fk": [
       {
         "column": "organism_id",
-        "parent": "ORGANISMO",
+        "parent": "ORGANISM",
         "target": "organism_id"
       },
       {
         "column": "map_id",
-        "parent": "PATHWAY_RIFERIMENTO",
+        "parent": "PATHWAY_REFERENCE",
         "target": "map_id"
       }
     ],
@@ -315,8 +315,8 @@
     ]
   },
   {
-    "name": "GENE_PROTEINA",
-    "file": "gene_proteina.tsv",
+    "name": "GENE_PROTEIN",
+    "file": "gene_protein.tsv",
     "columns": [
       "kegg_gene_id",
       "accession",
@@ -347,8 +347,8 @@
     }
   },
   {
-    "name": "GENE_ORTOLOGIA",
-    "file": "gene_ortologia.tsv",
+    "name": "GENE_ORTHOLOGY",
+    "file": "gene_orthology.tsv",
     "columns": [
       "kegg_gene_id",
       "ko_id"
@@ -366,7 +366,7 @@
       },
       {
         "column": "ko_id",
-        "parent": "ORTOLOGIA_KEGG",
+        "parent": "ORTHOLOGY_KEGG",
         "target": "ko_id"
       }
     ],
@@ -395,7 +395,7 @@
       },
       {
         "column": "pathway_id",
-        "parent": "PATHWAY_ORGANISMO",
+        "parent": "PATHWAY_ORGANISM",
         "target": "pathway_id"
       }
     ],
@@ -405,8 +405,8 @@
     }
   },
   {
-    "name": "ORTOLOGIA_REAZIONE",
-    "file": "ortologia_reazione.tsv",
+    "name": "ORTHOLOGY_REACTION",
+    "file": "orthology_reaction.tsv",
     "columns": [
       "ko_id",
       "reaction_id"
@@ -419,12 +419,12 @@
     "fk": [
       {
         "column": "ko_id",
-        "parent": "ORTOLOGIA_KEGG",
+        "parent": "ORTHOLOGY_KEGG",
         "target": "ko_id"
       },
       {
         "column": "reaction_id",
-        "parent": "REAZIONE_KEGG",
+        "parent": "REACTION_KEGG",
         "target": "reaction_id"
       }
     ],
@@ -434,8 +434,8 @@
     }
   },
   {
-    "name": "PATHWAY_REAZIONE",
-    "file": "pathway_reazione.tsv",
+    "name": "PATHWAY_REACTION",
+    "file": "pathway_reaction.tsv",
     "columns": [
       "map_id",
       "reaction_id"
@@ -448,12 +448,12 @@
     "fk": [
       {
         "column": "map_id",
-        "parent": "PATHWAY_RIFERIMENTO",
+        "parent": "PATHWAY_REFERENCE",
         "target": "map_id"
       },
       {
         "column": "reaction_id",
-        "parent": "REAZIONE_KEGG",
+        "parent": "REACTION_KEGG",
         "target": "reaction_id"
       }
     ],
@@ -463,8 +463,8 @@
     }
   },
   {
-    "name": "REAZIONE_COMPOSTO",
-    "file": "reazione_composto.tsv",
+    "name": "REACTION_COMPOUND",
+    "file": "reaction_compound.tsv",
     "columns": [
       "reaction_id",
       "compound_id"
@@ -477,12 +477,12 @@
     "fk": [
       {
         "column": "reaction_id",
-        "parent": "REAZIONE_KEGG",
+        "parent": "REACTION_KEGG",
         "target": "reaction_id"
       },
       {
         "column": "compound_id",
-        "parent": "COMPOSTO_KEGG",
+        "parent": "COMPOUND_KEGG",
         "target": "compound_id"
       }
     ],
@@ -492,8 +492,8 @@
     }
   },
   {
-    "name": "PROTEINA_GO",
-    "file": "proteina_go.tsv",
+    "name": "PROTEIN_GO",
+    "file": "protein_go.tsv",
     "columns": [
       "accession",
       "go_id",
@@ -516,7 +516,7 @@
       },
       {
         "column": "go_id",
-        "parent": "TERMINE_GO",
+        "parent": "GO_TERM",
         "target": "go_id"
       }
     ],
@@ -528,8 +528,8 @@
     }
   },
   {
-    "name": "PROTEINA_EC",
-    "file": "proteina_ec.tsv",
+    "name": "PROTEIN_EC",
+    "file": "protein_ec.tsv",
     "columns": [
       "accession",
       "ec_number"
@@ -547,7 +547,7 @@
       },
       {
         "column": "ec_number",
-        "parent": "NUMERO_EC",
+        "parent": "EC_NUMBER",
         "target": "ec_number"
       }
     ],
@@ -557,8 +557,8 @@
     }
   },
   {
-    "name": "REAZIONE_EC",
-    "file": "reazione_ec.tsv",
+    "name": "REACTION_EC",
+    "file": "reaction_ec.tsv",
     "columns": [
       "reaction_id",
       "ec_number"
@@ -571,12 +571,12 @@
     "fk": [
       {
         "column": "reaction_id",
-        "parent": "REAZIONE_KEGG",
+        "parent": "REACTION_KEGG",
         "target": "reaction_id"
       },
       {
         "column": "ec_number",
-        "parent": "NUMERO_EC",
+        "parent": "EC_NUMBER",
         "target": "ec_number"
       }
     ],
@@ -586,8 +586,8 @@
     }
   },
   {
-    "name": "ORTOLOGIA_PATHWAY",
-    "file": "ortologia_pathway.tsv",
+    "name": "ORTHOLOGY_PATHWAY",
+    "file": "orthology_pathway.tsv",
     "columns": [
       "ko_id",
       "map_id"
@@ -600,12 +600,12 @@
     "fk": [
       {
         "column": "ko_id",
-        "parent": "ORTOLOGIA_KEGG",
+        "parent": "ORTHOLOGY_KEGG",
         "target": "ko_id"
       },
       {
         "column": "map_id",
-        "parent": "PATHWAY_RIFERIMENTO",
+        "parent": "PATHWAY_REFERENCE",
         "target": "map_id"
       }
     ],
@@ -619,8 +619,8 @@
     }
   },
   {
-    "name": "ORTOLOGIA_EC",
-    "file": "ortologia_ec.tsv",
+    "name": "ORTHOLOGY_EC",
+    "file": "orthology_ec.tsv",
     "columns": [
       "ko_id",
       "ec_number"
@@ -633,12 +633,12 @@
     "fk": [
       {
         "column": "ko_id",
-        "parent": "ORTOLOGIA_KEGG",
+        "parent": "ORTHOLOGY_KEGG",
         "target": "ko_id"
       },
       {
         "column": "ec_number",
-        "parent": "NUMERO_EC",
+        "parent": "EC_NUMBER",
         "target": "ec_number"
       }
     ],

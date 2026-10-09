@@ -51,10 +51,10 @@ def test_raw_transform_repeat_and_external_reports(tmp_path):
     report, _ = validate(processed)
     assert len(report["files"]) == 22
     assert all(item["rows"] for item in report["files"].values())
-    assert (report_dir / "report_gene_proteina.tsv").is_file()
-    assert b'"3.5.1.n3"' in before["numero_ec.tsv"]
-    assert b'"3.5.1.n3"' in before["proteina_ec.tsv"]
-    assert b'"3.5.1.n3"' in before["reazione_ec.tsv"]
+    assert (report_dir / "report_gene_protein.tsv").is_file()
+    assert b'"3.5.1.n3"' in before["ec_number.tsv"]
+    assert b'"3.5.1.n3"' in before["protein_ec.tsv"]
+    assert b'"3.5.1.n3"' in before["reaction_ec.tsv"]
     repeat = command(home, "transform", extra_env={"UNIKEGG_ARTIFACTS_DIR": str(report_dir)})
     assert repeat.returncode == 0, repeat.stderr
     assert before == contents(processed)
@@ -118,7 +118,7 @@ def test_bad_raw_preserves_previous_bundle(tmp_path, damage):
     assert result.returncode != 0
     assert before == contents(processed)
     assert not list(processed.parent.glob(".unikegg-*"))
-    assert not (tmp_path / "artifacts/report_gene_proteina.tsv").exists()
+    assert not (tmp_path / "artifacts/report_gene_protein.tsv").exists()
 
 
 def test_empty_details_are_allowed_when_no_ids_are_selected(tmp_path):
@@ -130,8 +130,8 @@ def test_empty_details_are_allowed_when_no_ids_are_selected(tmp_path):
     result = command(tmp_path, "transform")
     assert result.returncode == 0, result.stderr
     report, _ = validate(tmp_path / "data/processed")
-    assert report["files"]["reazione_kegg.tsv"]["rows"] == 0
-    assert report["files"]["composto_kegg.tsv"]["rows"] == 0
+    assert report["files"]["reaction_kegg.tsv"]["rows"] == 0
+    assert report["files"]["compound_kegg.tsv"]["rows"] == 0
 
 
 def test_flat_parser_rejects_nested_or_unterminated_records(tmp_path):
@@ -171,7 +171,7 @@ def test_failure_after_entity_generation_preserves_bundle(tmp_path, monkeypatch)
     before = contents(output)
     monkeypatch.setattr(entities, "RAW_KEGG", tmp_path / "data/raw/kegg")
     monkeypatch.setattr(relations, "RAW_KEGG", tmp_path / "data/raw/kegg")
-    monkeypatch.setattr(relations, "CONTROLLI", tmp_path / "reports")
+    monkeypatch.setattr(relations, "REPORTS", tmp_path / "reports")
 
     def fail_relations():
         assert (entities.OUTPUT / "protein_uniprot.tsv").exists()
@@ -240,12 +240,12 @@ def test_isoforms_prefer_parent_and_are_order_independent(tmp_path, monkeypatch)
         },
     ]
     monkeypatch.setattr(entities, "OUTPUT", tmp_path)
-    monkeypatch.setattr(entities, "PROTEINE_ACC", {"P00001", "P00002"})
+    monkeypatch.setattr(entities, "PROTEIN_ACCESSIONS", {"P00001", "P00002"})
     monkeypatch.setattr(entities, "EC_KEGG", set())
     previous = None
     for source in [inputs, list(reversed(inputs))]:
-        monkeypatch.setattr(entities, "leggi_uniprot_tsv", lambda: iter(source))
-        entities.costruisci_go_ec_isoforme()
+        monkeypatch.setattr(entities, "read_uniprot_tsv", lambda: iter(source))
+        entities.build_go_ec_isoforms()
         data = list(rows(tmp_path, BY_NAME["PROTEIN_ISOFORM"]))
         assert len({(row["accession"], row["ordinal"]) for row in data}) == 2
         assert [(row["isoform_id"], row["ordinal"]) for row in data] == [
@@ -261,11 +261,11 @@ def test_isoforms_prefer_parent_and_are_order_independent(tmp_path, monkeypatch)
 
 def test_multiple_isoids_in_one_block_have_distinct_ordinals(tmp_path, monkeypatch):
     monkeypatch.setattr(entities, "OUTPUT", tmp_path)
-    monkeypatch.setattr(entities, "PROTEINE_ACC", {"P00001"})
+    monkeypatch.setattr(entities, "PROTEIN_ACCESSIONS", {"P00001"})
     monkeypatch.setattr(entities, "EC_KEGG", set())
     monkeypatch.setattr(
         entities,
-        "leggi_uniprot_tsv",
+        "read_uniprot_tsv",
         lambda: iter(
             [
                 {
@@ -275,7 +275,7 @@ def test_multiple_isoids_in_one_block_have_distinct_ordinals(tmp_path, monkeypat
             ]
         ),
     )
-    entities.costruisci_go_ec_isoforme()
+    entities.build_go_ec_isoforms()
     assert {row["ordinal"] for row in rows(tmp_path, BY_NAME["PROTEIN_ISOFORM"])} == {"1", "2"}
 
 
@@ -290,11 +290,11 @@ def test_ec_does_not_extract_valid_looking_substrings(text):
 
 
 def test_report_path_and_quoted_literal_null(tmp_path, monkeypatch):
-    monkeypatch.setattr(relations, "CONTROLLI", tmp_path / "outside-project")
-    relations.scrivi_report_gene_proteina({code: Counter() for code in relations.ORGANISMI})
-    assert (relations.CONTROLLI / "report_gene_proteina.tsv").is_file()
+    monkeypatch.setattr(relations, "REPORTS", tmp_path / "outside-project")
+    relations.write_gene_protein_report({code: Counter() for code in relations.ORGANISMS})
+    assert (relations.REPORTS / "report_gene_protein.tsv").is_file()
     monkeypatch.setattr(entities, "OUTPUT", tmp_path)
-    entities.scrivi_tsv("probe.tsv", ["value"], [["NULL"]])
+    entities.write_tsv("probe.tsv", ["value"], [["NULL"]])
     assert (tmp_path / "probe.tsv").read_text().splitlines()[1] == '"NULL"'
     with (tmp_path / "probe.tsv").open() as stream:
         assert list(tsv.reader(stream)) == [["value"], ["NULL"]]
@@ -330,13 +330,13 @@ def test_pipeline_in_process_success_restores_configuration(tmp_path, monkeypatc
     output = tmp_path / "data/processed"
     monkeypatch.setattr(entities, "RAW_KEGG", tmp_path / "data/raw/kegg")
     monkeypatch.setattr(relations, "RAW_KEGG", tmp_path / "data/raw/kegg")
-    monkeypatch.setattr(relations, "CONTROLLI", tmp_path / "external-reports")
-    old = (entities.OUTPUT, relations.OUTPUT, relations.CONTROLLI)
+    monkeypatch.setattr(relations, "REPORTS", tmp_path / "external-reports")
+    old = (entities.OUTPUT, relations.OUTPUT, relations.REPORTS)
     reviewed = os.environ.get("UNIKEGG_REVIEWED_DIR")
     pipeline.run(output, tmp_path / "data/raw/uniprot")
     before = contents(output)
     pipeline.run(output, tmp_path / "data/raw/uniprot")
     assert contents(output) == before
-    assert (entities.OUTPUT, relations.OUTPUT, relations.CONTROLLI) == old
+    assert (entities.OUTPUT, relations.OUTPUT, relations.REPORTS) == old
     assert os.environ.get("UNIKEGG_REVIEWED_DIR") == reviewed
     validate(output)

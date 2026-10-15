@@ -4,6 +4,13 @@ For server startup and configuration, first follow the [Python and SQL or Docker
 
 [Italian copy](english-names-migration.it.md).
 
+For bundles with the old EC/GO columns, the converter now also applies the
+[annotation migration](annotation-migration.md). Run `unikegg download-enzymes`
+first, or pass `--enzyme-catalog` explicitly. These bundles retain their source
+directory but receive enriched EC fields, cleaned protein names and the reduced
+GO association columns. Existing databases also need migration 006 before update.
+The byte-preservation statements below apply to name-only conversions.
+
 New installations use English domain table names, English TSV filenames and English guide filenames. Columns, keys, biological identifiers and source values remain unchanged. Italian-language guides use the same English base filename plus `.it.md`.
 
 ## Name mapping

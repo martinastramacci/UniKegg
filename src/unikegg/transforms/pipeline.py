@@ -85,6 +85,7 @@ def publish(stage, directory):
 def run(directory, reviewed_export=None, codes=None):
     reviewed = Path(reviewed_export or os.environ.get("UNIKEGG_REVIEWED_DIR", RAW / "uniprot"))
     with ExitStack() as stack:
+        stack.enter_context(file_lock(entities.RAW_KEGG.parent / "enzyme/.acquisition.lock"))
         # Managed sources and transformation must never mutate/read each other.
         # Legacy read-only manual exports keep their existing contract.
         for root in (entities.RAW_KEGG, reviewed):

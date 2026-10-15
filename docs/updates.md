@@ -40,6 +40,7 @@ The first load into an empty database remains `unikegg load`; it records version
 ```bash
 unikegg download-kegg --refresh
 unikegg download-uniprot --refresh
+unikegg download-enzymes --refresh
 unikegg transform
 unikegg update --dry-run
 unikegg update

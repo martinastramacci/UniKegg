@@ -59,11 +59,20 @@ def initialize():
                 raise RuntimeError("Refusing to touch a nonempty integration-test schema")
             for path in sorted((ROOT / "db/init").glob("*.sql")):
                 for sql in statements(path):
+                    if "CREATE TABLE EC_NUMBER (" in sql:
+                        sql = "CREATE TABLE EC_NUMBER (ec_number VARCHAR(20) PRIMARY KEY)"
+                    elif "CREATE TABLE PROTEIN_GO (" in sql:
+                        sql = sql.replace(
+                            "go_id CHAR(10),", "go_id CHAR(10), evidence_code VARCHAR(12), "
+                            "evidence_source VARCHAR(100),",
+                        )
                     # Upgrade the old domain schema; Compose tests fresh DDL.
                     if not re.search(r"CREATE TABLE ORTHOLOGY_(PATHWAY|EC)\b", sql):
                         cursor.execute(sql)
             migration = ROOT / "db/migrations/004_orthology_links.sql"
             for sql in statements(migration):
+                cursor.execute(sql)
+            for sql in statements(ROOT / "db/migrations/006_annotations.sql"):
                 cursor.execute(sql)
             # Reapplication emits expected 'already exists' notes.
             connection.raise_on_warnings = False

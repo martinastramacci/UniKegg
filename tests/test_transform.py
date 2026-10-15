@@ -228,6 +228,7 @@ def test_destination_and_lock_guards(tmp_path):
 
 
 def test_isoforms_prefer_parent_and_are_order_independent(tmp_path, monkeypatch):
+    monkeypatch.setattr(entities, "read_catalog", lambda path: {})
     inputs = [
         {
             "Entry": "P00001",
@@ -260,6 +261,7 @@ def test_isoforms_prefer_parent_and_are_order_independent(tmp_path, monkeypatch)
 
 
 def test_multiple_isoids_in_one_block_have_distinct_ordinals(tmp_path, monkeypatch):
+    monkeypatch.setattr(entities, "read_catalog", lambda path: {})
     monkeypatch.setattr(entities, "OUTPUT", tmp_path)
     monkeypatch.setattr(entities, "PROTEIN_ACCESSIONS", {"P00001"})
     monkeypatch.setattr(entities, "EC_KEGG", set())

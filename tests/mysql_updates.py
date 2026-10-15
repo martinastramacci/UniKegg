@@ -72,7 +72,9 @@ def run(directory, original):
     data["ORTHOLOGY_KEGG"][0]["definition"] = "Updated KO definition"
     data["PATHWAY_REFERENCE"].append({"map_id": "map00020", "name": "New map"})
     data["ORTHOLOGY_PATHWAY"].append({"ko_id": "K00001", "map_id": "map00020"})
-    data["EC_NUMBER"].append({"ec_number": "2.7.1.999"})
+    data["EC_NUMBER"].append({
+        "ec_number": "2.7.1.999", "name": "New enzyme", "catalytic_activity": "", "comment": "",
+    })
     data["ORTHOLOGY_EC"] = [{"ko_id": "K00001", "ec_number": "2.7.1.999"}]
     removed_protein = proteins[-1]["accession"]
     removed_gene = data["GENE_KEGG"][-1]["kegg_gene_id"]

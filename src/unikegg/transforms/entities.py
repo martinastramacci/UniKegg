@@ -9,7 +9,8 @@ from unikegg import tsv
 from unikegg.acquire.reviewed import reviewed_rows
 from unikegg.config import PROCESSED as OUTPUT
 from unikegg.config import RAW
-from unikegg.identifiers import EC_RE
+from unikegg.enzymes import EC_FIELDS, read_catalog
+from unikegg.identifiers import EC_RE, without_ec_annotations
 from unikegg.kegg_data import detail_records as read_flat_records
 from unikegg.kegg_data import orthology_links, preflight, tabular_rows
 from unikegg.organisms import active, recorded_selection
@@ -198,7 +199,7 @@ def build_uniprot_proteins():
                 accession,
                 ORGANISM_BY_TAXID[taxid],
                 row.get("Entry Name", "").strip(),
-                clean_text(row.get("Protein names", "")),
+                without_ec_annotations(clean_text(row.get("Protein names", ""))),
                 lunghezza,
                 massa,
                 clean_text(row.get("Protein existence", "")) or "Not provided",
@@ -397,7 +398,11 @@ def build_go_ec_isoforms():
         [[go_id, nome, ns] for go_id, (nome, ns) in sorted(go.items())],
     )
     ec_totali = ec_uniprot | EC_KEGG
-    write_tsv("ec_number.tsv", ["ec_number"], [[valore] for valore in sorted(ec_totali)])
+    catalog = read_catalog(RAW_KEGG.parent / "enzyme/enzyme.rdf.xz")
+    write_tsv(
+        "ec_number.tsv", ["ec_number", *EC_FIELDS],
+        [[value, *catalog.get(value, ["", "", ""])] for value in sorted(ec_totali)],
+    )
     print(
         f"[build_entities] EC_NUMBER: {len(ec_uniprot)} da UniProt, "
         f"{len(EC_KEGG - ec_uniprot)} aggiunti dalle reazioni KEGG, {len(ec_totali)} totali."

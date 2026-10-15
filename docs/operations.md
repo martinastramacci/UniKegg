@@ -41,6 +41,7 @@ unikegg download-kegg --dry-run
 # After reviewing access terms and the request scope:
 unikegg download-uniprot
 unikegg download-kegg
+unikegg download-enzymes
 unikegg transform
 ```
 

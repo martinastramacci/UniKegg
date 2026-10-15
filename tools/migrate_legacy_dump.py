@@ -18,8 +18,10 @@ from pathlib import Path
 import mysql.connector
 
 from unikegg import tsv
+from unikegg.config import RAW
 from unikegg.dataset import TABLES, sha256
-from unikegg.identifiers import EC_RE
+from unikegg.enzymes import EC_FIELDS, read_catalog
+from unikegg.identifiers import EC_RE, without_ec_annotations
 from unikegg.kegg_data import acquisition_manifest, orthology_links, strip_prefix, tabular_rows
 from unikegg.legacy_names import LEGACY_TABLE_NAMES
 
@@ -202,7 +204,33 @@ def direct_links(raw):
     }, excluded
 
 
-def run(source, output, raw):
+def upgrade_annotations(connection, catalog):
+    """Run only in the isolated restored dump, after the preservation audit."""
+    columns = {r[0] for r in query(connection, "SHOW COLUMNS FROM PROTEIN_GO")}
+    for column in ("evidence_code", "evidence_source"):
+        if column in columns:
+            execute(connection, f"ALTER TABLE PROTEIN_GO DROP COLUMN `{column}`")
+    columns = {r[0] for r in query(connection, "SHOW COLUMNS FROM EC_NUMBER")}
+    for column in EC_FIELDS:
+        if column not in columns:
+            execute(connection, f"ALTER TABLE EC_NUMBER ADD COLUMN `{column}` TEXT NULL")
+    changed = []
+    for accession, name in query(connection, "SELECT accession, protein_name FROM PROTEIN_UNIPROT"):
+        if name is not None and (cleaned := without_ec_annotations(name)) != name:
+            changed.append((cleaned or None, accession))
+    with connection.cursor() as cursor:
+        if changed:
+            cursor.executemany("UPDATE PROTEIN_UNIPROT SET protein_name=%s WHERE accession=%s", changed)
+        cursor.executemany(
+            "UPDATE EC_NUMBER SET name=%s,catalytic_activity=%s,comment=%s WHERE ec_number=%s",
+            [tuple(v or None for v in fields) + (ec,) for ec, fields in catalog.items()],
+        )
+    connection.commit()
+    return {"protein_names_cleaned": len(changed)}
+
+
+def run(source, output, raw, enzyme_catalog=RAW / "enzyme/enzyme.rdf.xz"):
+    catalog = read_catalog(enzyme_catalog)
     output.mkdir(parents=True, exist_ok=True)
     dump = output / "unikegg_updated.sql"
     if dump.exists() or (output / "migration_report.json").exists():
@@ -268,11 +296,6 @@ def run(source, output, raw):
             original_fingerprints[name] = fingerprint(connection, name, columns, table["pk"])
             emit(f"Original {name}: {original_fingerprints[name]['rows']} rows")
         report["original_tables"] = original_fingerprints
-        if "evidence_code" not in original_columns["PROTEIN_GO"]:
-            execute(
-                connection,
-                "ALTER TABLE PROTEIN_GO ADD COLUMN evidence_code VARCHAR(12) NULL, ADD COLUMN evidence_source VARCHAR(100) NULL",
-            )
         migration = (PROJECT / "db/migrations/004_orthology_links.sql").read_text()
         for sql in re.sub(r"--[^\n]*", "", migration).split(";"):
             if sql.strip():
@@ -306,7 +329,9 @@ def run(source, output, raw):
                 for offset in range(0, len(records), 2000):
                     batch = records[offset : offset + 2000]
                     cursor.executemany(
-                        f"INSERT INTO `{name}` VALUES ({','.join(['%s'] * len(batch[0]))})", batch
+                        f"INSERT INTO `{name}`"
+                        + (" (ec_number)" if name == "EC_NUMBER" else "")
+                        + f" VALUES ({','.join(['%s'] * len(batch[0]))})", batch
                     )
             emit(f"Added {name}: {len(records)} rows")
         connection.commit()
@@ -319,8 +344,10 @@ def run(source, output, raw):
             )
             if after != original_fingerprints[name]:
                 raise ValueError(f"Original biological values changed: {name}")
-        report["all_original_values_preserved"] = True
-        emit("All original rows and values preserved; FK and biological consistency audit passed")
+        report["original_values_verified_before_annotation_migration"] = True
+        emit("Original values verified; applying the requested annotation migration")
+        report["annotation_changes"] = upgrade_annotations(connection, catalog)
+        report["enzyme_catalog_sha256"] = sha256(enzyme_catalog)
         current_kos = {strip_prefix(row[0]) for row in tabular_rows(raw / "ko/ko_list.tsv")}
         current_maps = {
             strip_prefix(row[0]) for row in tabular_rows(raw / "pathway/pathway_reference.tsv")
@@ -398,5 +425,6 @@ if __name__ == "__main__":
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--raw", type=Path, required=True)
+    parser.add_argument("--enzyme-catalog", type=Path, default=RAW / "enzyme/enzyme.rdf.xz")
     args = parser.parse_args()
-    run(args.source.resolve(), args.output.resolve(), args.raw.resolve())
+    run(args.source.resolve(), args.output.resolve(), args.raw.resolve(), args.enzyme_catalog)

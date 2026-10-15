@@ -225,7 +225,7 @@ def build_protein_go_ec():
             if accession in proteins:
                 for go_id in sorted(set(re.findall(r"GO:\d{7}", row.get("Gene Ontology IDs", "")))):
                     if go_id in go_validi:
-                        yield [accession, go_id, "", "UniProt export"]
+                        yield [accession, go_id]
 
     def ec_rows():
         for row in read_uniprot_tsv():
@@ -236,7 +236,7 @@ def build_protein_go_ec():
                         yield [accession, ec_number]
 
     write_tsv(
-        "protein_go.tsv", ["accession", "go_id", "evidence_code", "evidence_source"], go_rows()
+        "protein_go.tsv", ["accession", "go_id"], go_rows()
     )
     write_tsv("protein_ec.tsv", ["accession", "ec_number"], ec_rows())
 

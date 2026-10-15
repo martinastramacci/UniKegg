@@ -16,7 +16,7 @@ An accession match validates dataset selection, not sequence identity against ev
 
 Complete, incomplete and preliminary EC identifiers (including a fourth component such as `n3`) are preserved. Queries explicitly selecting complete ECs require four numeric components; preliminary identifiers are not treated as complete enzyme assignments. KEGG annotations, GO evidence and EC assignments are integrated associations. A shared EC number or pathway assignment does not establish reaction direction, flux or experimental activity. Isoform metadata does not imply that all isoform sequences are stored: canonical sequences reside in `PROTEIN_UNIPROT`; isoform records describe identifiers and sequence status.
 
-The preserved `PROTEIN_GO` grain is one accession/GO pair with one evidence-code/source representation. The current schema does not retain an arbitrary history of competing evidence assertions. Temporal versioning, source-release reconciliation and evidence multiplicity require explicit schema extensions.
+`PROTEIN_GO` stores one accession/GO pair. The TSV source does not supply per-annotation evidence; the empty evidence code and constant export-source columns have been removed. Evidence assertions require a different acquisition source and an explicit schema extension.
 
 ## Distribution boundaries
 

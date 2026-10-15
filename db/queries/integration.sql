@@ -72,7 +72,7 @@ WHERE
 ORDER BY r.reaction_id;
 
 
-SELECT DISTINCT g.kegg_gene_id, k.ko_id, p.accession, t.go_id, t.name, pg.evidence_code
+SELECT DISTINCT g.kegg_gene_id, k.ko_id, p.accession, t.go_id, t.name
 FROM GENE_KEGG g
 JOIN ORGANISM o ON o.organism_id = g.organism_id
 JOIN GENE_ORTHOLOGY k ON k.kegg_gene_id = g.kegg_gene_id

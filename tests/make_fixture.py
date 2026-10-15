@@ -17,7 +17,7 @@ def generate(directory, edge_cases=False, legacy_quoting=False):
     data["REACTION_KEGG"] = [["R00001", "Synthetic reaction", "", "C00001 = C00001"]]
     data["COMPOUND_KEGG"] = [["C00001", "Synthetic compound", "H2O", "18.0106", "18.015"]]
     data["GO_TERM"] = [["GO:0000001", "Synthetic term", "MF"]]
-    data["EC_NUMBER"] = [["1.1.1.1"]]
+    data["EC_NUMBER"] = [["1.1.1.1", "Synthetic enzyme", "A = B", "Synthetic comment"]]
     for index, code in enumerate(sorted(CODES), 1):
         accession, gene, pathway = f"SYN{index:06d}", f"{code}:demo1", f"{code}00010"
         data["ORGANISM"].append([index, code, 9000000 + index, f"Synthetic {code}"])
@@ -33,7 +33,7 @@ def generate(directory, edge_cases=False, legacy_quoting=False):
             data["GENE_PROTEIN"].append([gene, accession, source])
         data["GENE_ORTHOLOGY"].append([gene, "K00001"])
         data["GENE_PATHWAY"].append([gene, pathway])
-        data["PROTEIN_GO"].append([accession, "GO:0000001", "", ""])
+        data["PROTEIN_GO"].append([accession, "GO:0000001"])
         data["PROTEIN_EC"].append([accession, "1.1.1.1"])
     data["ORTHOLOGY_PATHWAY"] = [["K00001", "map00010"]]
     data["ORTHOLOGY_EC"] = [["K00001", "1.1.1.1"]]
@@ -54,7 +54,7 @@ def generate(directory, edge_cases=False, legacy_quoting=False):
         data["PROTEIN_UNIPROT"][3][3] = " "
         data["PROTEIN_UNIPROT"][4][3] = "\u0301"
         data["GO_TERM"][0][1] = "λ" * 500
-        data["EC_NUMBER"].append(["3.5.1.n3"])
+        data["EC_NUMBER"].append(["3.5.1.n3", "", "", ""])
         human = next(
             p[0] for p in data["PROTEIN_UNIPROT"] if p[1] == sorted(CODES).index("hsa") + 1
         )

@@ -144,6 +144,7 @@ unikegg download-uniprot --organisms hsa,eco --dry-run
 unikegg download-kegg --organisms hsa,eco --dry-run
 unikegg download-uniprot --organisms hsa,eco
 unikegg download-kegg --organisms hsa,eco
+unikegg download-enzymes
 unikegg transform
 unikegg validate
 ```

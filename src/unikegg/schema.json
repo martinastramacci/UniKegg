@@ -148,15 +148,25 @@
     "name": "EC_NUMBER",
     "file": "ec_number.tsv",
     "columns": [
-      "ec_number"
+      "ec_number",
+      "name",
+      "catalytic_activity",
+      "comment"
     ],
     "pk": [
       "ec_number"
     ],
-    "nullable": [],
+    "nullable": [
+      "name",
+      "catalytic_activity",
+      "comment"
+    ],
     "fk": [],
     "specs": {
-      "ec_number": "VARCHAR(20) PRIMARY KEY"
+      "ec_number": "VARCHAR(20) PRIMARY KEY",
+      "name": "TEXT",
+      "catalytic_activity": "TEXT",
+      "comment": "TEXT"
     }
   },
   {
@@ -496,18 +506,13 @@
     "file": "protein_go.tsv",
     "columns": [
       "accession",
-      "go_id",
-      "evidence_code",
-      "evidence_source"
+      "go_id"
     ],
     "pk": [
       "accession",
       "go_id"
     ],
-    "nullable": [
-      "evidence_code",
-      "evidence_source"
-    ],
+    "nullable": [],
     "fk": [
       {
         "column": "accession",
@@ -522,9 +527,7 @@
     ],
     "specs": {
       "accession": "VARCHAR(10)",
-      "go_id": "CHAR(10)",
-      "evidence_code": "VARCHAR(12)",
-      "evidence_source": "VARCHAR(100)"
+      "go_id": "CHAR(10)"
     }
   },
   {

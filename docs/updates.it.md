@@ -38,6 +38,7 @@ Il primo caricamento di un database vuoto resta `unikegg load`, che registra la 
 ```bash
 unikegg download-kegg --refresh
 unikegg download-uniprot --refresh
+unikegg download-enzymes --refresh
 unikegg transform
 unikegg update --dry-run
 unikegg update

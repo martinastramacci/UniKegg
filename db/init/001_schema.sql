@@ -77,7 +77,10 @@ CREATE TABLE GO_TERM (
 );
 
 CREATE TABLE EC_NUMBER (
-    ec_number VARCHAR(20) PRIMARY KEY
+    ec_number VARCHAR(20) PRIMARY KEY,
+    name TEXT,
+    catalytic_activity TEXT,
+    comment TEXT
 );
 
 CREATE TABLE PROTEIN_ISOFORM (
@@ -146,8 +149,6 @@ CREATE TABLE REACTION_COMPOUND (
 CREATE TABLE PROTEIN_GO (
     accession VARCHAR(10),
     go_id CHAR(10),
-    evidence_code VARCHAR(12),
-    evidence_source VARCHAR(100),
     PRIMARY KEY (accession, go_id),
     FOREIGN KEY (accession) REFERENCES PROTEIN_UNIPROT (accession) ON DELETE CASCADE,
     FOREIGN KEY (go_id) REFERENCES GO_TERM (go_id)

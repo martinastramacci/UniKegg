@@ -22,6 +22,7 @@ def main(argv=None):
             "manifest",
             "download-uniprot",
             "download-kegg",
+            "download-enzymes",
             "list-organisms",
         ],
     )
@@ -53,10 +54,12 @@ def main(argv=None):
     )
     parser.add_argument("--attempts", type=int, help="HTTP attempts per request, default 4 (1..20)")
     args = parser.parse_args(argv)
-    downloading = args.command in {"download-uniprot", "download-kegg"}
+    downloading = args.command in {"download-uniprot", "download-kegg", "download-enzymes"}
     explicit = args.organisms is not None or args.limit is not None or args.all_organisms
     if args.dry_run and not downloading and args.command != "update":
-        parser.error("--dry-run is supported only by download-uniprot, download-kegg and update")
+        parser.error("--dry-run is supported only by download commands and update")
+    if explicit and args.command == "download-enzymes":
+        parser.error("download-enzymes downloads the complete organism-independent catalog")
     if args.reviewed_export and args.command not in {"transform", "manifest"}:
         parser.error("--reviewed-export is supported only by transform and manifest")
     if explicit and args.command in {"load", "verify", "validate", "update", "history"}:
@@ -141,6 +144,11 @@ def main(argv=None):
                 batch=args.batch,
                 append=args.append,
             )
+        elif args.command == "download-enzymes":
+            from unikegg.acquire import enzymes
+
+            options.pop("codes")
+            enzymes.run(**options)
         else:
             kegg.run(**options)
 

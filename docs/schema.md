@@ -39,6 +39,9 @@ erDiagram
     }
     EC_NUMBER {
         varchar ec_number PK
+        text name
+        text catalytic_activity
+        text comment
     }
     GENE_KEGG {
         varchar kegg_gene_id PK
@@ -107,8 +110,6 @@ erDiagram
     PROTEIN_GO {
         varchar accession PK,FK
         char go_id PK,FK
-        varchar evidence_code
-        varchar evidence_source
     }
     PROTEIN_EC {
         varchar accession PK,FK
@@ -159,7 +160,7 @@ Twenty-two domain tables are shown. `ETL_LOAD_STATE` and `ETL_DATASET_HISTORY` a
 | `REACTION_KEGG` | `reaction_id` | KEGG reaction |
 | `COMPOUND_KEGG` | `compound_id` | KEGG compound |
 | `GO_TERM` | `go_id` | GO term |
-| `EC_NUMBER` | `ec_number` | EC identifier |
+| `EC_NUMBER` | `ec_number` | EC identifier, name, catalytic activity and comment from UniProt ENZYME |
 | `GENE_KEGG` | `kegg_gene_id` | KEGG gene |
 | `PROTEIN_UNIPROT` | `accession` | Reviewed canonical protein and sequence |
 | `PATHWAY_ORGANISM` | `pathway_id` | Organism-specific pathway |

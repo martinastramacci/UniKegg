@@ -158,7 +158,8 @@ def test_reader_configures_own_field_limit(tmp_path):
 def test_blank_and_unterminated_csv_rows_rejected(tmp_path):
     generate(tmp_path)
     path = tmp_path / "ec_number.tsv"
-    for content in ["ec_number\n\n", 'ec_number\n"unterminated\n']:
+    header = "\t".join(BY_NAME["EC_NUMBER"]["columns"]) + "\n"
+    for content in [header + "\n", header + '"unterminated\n']:
         path.write_text(content)
         with pytest.raises(ValueError, match="Invalid column count|Invalid TSV"):
             list(rows(tmp_path, BY_NAME["EC_NUMBER"]))

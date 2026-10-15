@@ -55,7 +55,8 @@ INTO TABLE EC_NUMBER
 CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
-(ec_number);
+(ec_number, @name, @catalytic_activity, @comment)
+SET name = IF(OCTET_LENGTH(@name) = 0, NULL, @name), catalytic_activity = IF(OCTET_LENGTH(@catalytic_activity) = 0, NULL, @catalytic_activity), comment = IF(OCTET_LENGTH(@comment) = 0, NULL, @comment);
 
 -- Load GENE_KEGG.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/gene_kegg.tsv'
@@ -146,8 +147,7 @@ INTO TABLE PROTEIN_GO
 CHARACTER SET utf8mb4
 FIELDS TERMINATED BY '\t' OPTIONALLY ENCLOSED BY '"' ESCAPED BY ''
 LINES TERMINATED BY '\n' IGNORE 1 LINES
-(accession, go_id, @evidence_code, @evidence_source)
-SET evidence_code = IF(OCTET_LENGTH(@evidence_code) = 0, NULL, @evidence_code), evidence_source = IF(OCTET_LENGTH(@evidence_source) = 0, NULL, @evidence_source);
+(accession, go_id);
 
 -- Load PROTEIN_EC.
 LOAD DATA LOCAL INFILE '{{DATA_DIR}}/protein_ec.tsv'

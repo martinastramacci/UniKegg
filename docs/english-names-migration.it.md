@@ -1,5 +1,7 @@
 # Migrazione dei nomi e dei file del dataset in inglese
 
+Per i bundle con le vecchie colonne EC/GO, il convertitore applica anche la [migrazione delle annotazioni](annotation-migration.md): eseguire prima `unikegg download-enzymes` oppure passare `--enzyme-catalog`. I dati originali rimangono nella directory sorgente; il risultato contiene EC arricchiti, nomi senza annotazioni EC e associazioni GO prive dei due attributi eliminati. Sul database esistente serve anche la migrazione 006 prima di `update`. Le indicazioni di conservazione byte per byte qui sotto valgono per le sole rinomine.
+
 Per avviare e configurare il server, seguire prima i percorsi [Python e SQL oppure Docker e SQL](command-guide.it.md). La sezione C3 mostra anche come eseguire gli strumenti di migrazione nei container.
 
 [Versione inglese](english-names-migration.it.md).

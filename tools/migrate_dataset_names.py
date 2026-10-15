@@ -6,12 +6,15 @@ import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from unikegg import tsv
+from unikegg.config import RAW
 from unikegg.dataset import TABLES, sha256, validate
 from unikegg.legacy_names import LEGACY_TABLE_NAMES
+from unikegg.transforms.annotations import run as migrate_annotations
 from unikegg.transforms.pipeline import output_lock, publish
 
 
-def run(source, destination):
+def run(source, destination, enzyme_catalog=RAW / "enzyme/enzyme.rdf.xz"):
     source, destination = Path(source).resolve(), Path(destination).resolve()
     if source == destination or source in destination.parents:
         raise ValueError("Destination must be separate from the source bundle")
@@ -40,6 +43,12 @@ def run(source, destination):
             converted[new] = entry
         metadata["files"] = converted
         (stage / "manifest.json").write_text(json.dumps(metadata, indent=2) + "\n")
+        with (stage / "ec_number.tsv").open() as stream:
+            old_annotations = next(tsv.reader(stream)) == ["ec_number"]
+        if old_annotations:
+            annotated = Path(temporary) / "annotated"
+            migrate_annotations(stage, annotated, enzyme_catalog)
+            stage = annotated
         # Validate headers, row counts, identifiers, biological constraints and
         # every foreign key before publishing. Reviewed declarations are retained.
         validate(stage, metadata.get("dataset_kind"))
@@ -51,8 +60,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--enzyme-catalog", type=Path, default=RAW / "enzyme/enzyme.rdf.xz")
     args = parser.parse_args()
-    print(run(args.source, args.output))
+    print(run(args.source, args.output, args.enzyme_catalog))
 
 
 if __name__ == "__main__":

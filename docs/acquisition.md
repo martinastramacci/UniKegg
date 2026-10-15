@@ -44,12 +44,14 @@ unikegg list-organisms --search pombe
 # All 16 curated organisms (default):
 unikegg download-kegg
 unikegg download-uniprot
+unikegg download-enzymes
 unikegg transform
 unikegg validate
 
 # A specific selection:
 unikegg download-kegg --organisms hsa,eco,spo
 unikegg download-uniprot --organisms hsa,eco,spo
+unikegg download-enzymes
 unikegg transform
 
 # First 12 in catalog order:
@@ -138,6 +140,7 @@ A separate directory is preferable for new data:
 export UNIKEGG_DATA_DIR="$PWD/data-snapshot-2026-09"
 unikegg download-kegg --all-organisms
 unikegg download-uniprot --all-organisms
+unikegg download-enzymes
 unikegg transform
 ```
 

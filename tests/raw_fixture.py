@@ -2,6 +2,7 @@
 
 import csv
 import gzip
+import lzma
 from pathlib import Path
 
 from unikegg.transforms.entities import ORGANISMS
@@ -25,6 +26,17 @@ HEADERS = [
     "Alternative products (isoforms)",
 ]
 
+ENZYME_RDF = b'''<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+ xmlns:up="http://purl.uniprot.org/core/" xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+ xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
+ <rdf:Description rdf:about="1.1.1.1">
+  <skos:prefLabel>Synthetic enzyme</skos:prefLabel>
+  <up:activity rdf:resource="1.1.1.1#activity"/>
+  <rdfs:comment>Synthetic comment.</rdfs:comment>
+ </rdf:Description>
+ <rdf:Description rdf:about="1.1.1.1#activity"><rdfs:label>A = B</rdfs:label></rdf:Description>
+</rdf:RDF>'''
+
 
 def raw_tsv(path, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -46,6 +58,9 @@ def write_uniprot(path, proteins):
 
 def generate(home):
     home = Path(home)
+    enzyme = home / "data/raw/enzyme/enzyme.rdf.xz"
+    enzyme.parent.mkdir(parents=True, exist_ok=True)
+    enzyme.write_bytes(lzma.compress(ENZYME_RDF))
     kegg = home / "data/raw/kegg"
     proteins, organisms = [], []
     for index, code in ORGANISMS:
@@ -58,7 +73,7 @@ def generate(home):
                 9000000 + index,
                 f"Synthetic {code}",
                 gene + ";",
-                "Synthetic protein",
+                "Synthetic protein (NAD(+)) (EC 1.1.1.1, EC 3.5.1.n3)",
                 4,
                 400,
                 "Evidence at protein level",

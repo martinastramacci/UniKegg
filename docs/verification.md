@@ -2,6 +2,30 @@
 
 For installations with previous Italian table or TSV names, first follow the [English naming migration](english-names-migration.md).
 
+## Quality, provenance and offline measurements — 2026-10-24
+
+The read-only quality command validated the existing 22-table, 16-organism bundle
+with manifest fingerprint
+`05927dd1e6669b978d2b846e1c7c5f57569448302c28a0857e90a59e0f53d475`.
+It counted 271,692 genes, 106,775 proteins and 101,575 distinct gene/protein pairs:
+101,272 supported by both sources, 252 by KEGG only, and 51 by UniProt only.
+There were 6,906 proteins without a gene mapping. These are integration metrics,
+not an independent biological validation.
+
+One local Python run took 18.23 seconds for copying, validating and reporting,
+with process peak RSS 463,302,656 bytes (about 442 MiB) and a private snapshot of
+144,533,848 bytes (about 138 MiB). The workstation was not isolated from other work;
+this is a single observed run, not a throughput guarantee. The local report is
+`artifacts/quality-2026-10-24-05927dd1e666.json` (excluded from Git).
+
+New provenance/quality integration was exercised using synthetic raw fixtures,
+including repeated transforms, reordered raw files, concurrent source changes,
+mapping multiplicity, missing mappings, zero denominators and baseline comparison.
+Existing bundles were not rewritten or assigned retrospective provenance.
+The MySQL benchmark transaction and error cleanup were checked with mocked
+connections only: connection credentials were not configured for a live run.
+No load/update performance, MySQL disk peaks or backup restore was measured here.
+
 ## Main-project patch verification — 2026-10-08
 
 Applied `prova_unikegg/artifacts/main-project-english.patch` to the main

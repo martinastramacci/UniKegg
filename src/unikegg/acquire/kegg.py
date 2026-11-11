@@ -194,6 +194,29 @@ def fetch(endpoint, relative, dry_run=False, *, client=None, metadata=None, refr
         temporary.unlink(missing_ok=True)
 
 
+def cached_record(directory, identifier):
+    for relative in (f"records/{identifier}.txt", f"{identifier}.txt"):
+        path = directory / relative
+        if not path.is_file():
+            continue
+        try:
+            with path.open(encoding="utf-8") as stream:
+                records = list(flat_records(stream, str(path)))
+            if len(records) != 1 or records[0]["ENTRY"][0].split()[0] != identifier:
+                continue
+            if relative != f"records/{identifier}.txt":
+                target = directory / "records" / f"{identifier}.txt"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                temporary = target.with_suffix(".part")
+                temporary.write_bytes(path.read_bytes())
+                temporary.replace(target)
+                path = target
+            return {"file": path.relative_to(directory).as_posix(), "sha256": sha256(path)}
+        except (OSError, ValueError):
+            continue
+    return None
+
+
 def run(dry_run=False, codes=None, refresh=False, interval=1.0, attempts=4):
     codes = select(codes)
     client = HttpClient(interval, attempts)
@@ -215,9 +238,27 @@ def run(dry_run=False, codes=None, refresh=False, interval=1.0, attempts=4):
         for category, identifiers in selected_details(ROOT, codes).items():
             identifiers = sorted(identifiers)
             directory = ROOT / "details" / category
-            files = []
-            for offset in range(0, len(identifiers), 10):
-                batch = identifiers[offset : offset + 10]
+            indexed = {}
+            missing = []
+            for identifier in identifiers:
+                cached = None if refresh else cached_record(directory, identifier)
+                if cached is not None:
+                    indexed[identifier] = cached
+                else:
+                    missing.append(identifier)
+            if indexed and missing:
+                print(
+                    f"KEGG {category}: reusing {len(indexed)} cached records, "
+                    f"fetching {len(missing)} missing",
+                    flush=True,
+                )
+            elif indexed and not missing:
+                print(
+                    f"KEGG {category}: reusing all {len(indexed)}/{len(identifiers)} cached records",
+                    flush=True,
+                )
+            for offset in range(0, len(missing), 10):
+                batch = missing[offset : offset + 10]
                 relative = f"batches/{category}/{batch[0]}__{batch[-1]}.txt"
                 fetch(
                     "/get/" + "+".join(batch),
@@ -242,12 +283,14 @@ def run(dry_run=False, codes=None, refresh=False, interval=1.0, attempts=4):
                         temporary = path.with_suffix(".part")
                         temporary.write_text(text, encoding="utf-8")
                         temporary.replace(path)
-                        files.append(
-                            {"file": path.relative_to(directory).as_posix(), "sha256": sha256(path)}
-                        )
+                        indexed[identifier] = {
+                            "file": path.relative_to(directory).as_posix(),
+                            "sha256": sha256(path),
+                        }
                 print(
-                    f"KEGG {category}: {min(offset + 10, len(identifiers))}/{len(identifiers)}",
+                    f"KEGG {category}: {len(indexed)}/{len(identifiers)}",
                     flush=True,
                 )
+            files = [indexed[identifier] for identifier in identifiers]
             atomic_json(directory / "active.json", files)
         selection_state(ROOT, codes, "complete")

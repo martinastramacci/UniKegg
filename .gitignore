@@ -34,7 +34,14 @@ __pycache__/
 .ruff_cache/
 build/
 dist/
+# Log files
 *.log
+commands.log
+
+# Docker
+.docker/
+docker-compose.override.yml
+*.sock
 .coverage
 htmlcov/
 .DS_Store

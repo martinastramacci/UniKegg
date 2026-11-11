@@ -92,10 +92,10 @@ REQUIRED_COLUMNS = {
 }
 
 
-def build_url(query: str, formato: str, campi=()) -> str:
-    parameters = {"query": query, "format": formato, "compressed": "true"}
-    if campi:
-        parameters["fields"] = ",".join(campi)
+def build_url(query: str, fmt: str, fields=()) -> str:
+    parameters = {"query": query, "format": fmt, "compressed": "true"}
+    if fields:
+        parameters["fields"] = ",".join(fields)
     return URL + "?" + urllib.parse.urlencode(parameters)
 
 
@@ -183,12 +183,16 @@ def cached(path, url, metadata):
 
 
 def record(path, url, metadata, **extra):
+    now = datetime.now(timezone.utc).isoformat()
+    size = path.stat().st_size
     item = {
         "url": url,
         "file": path.relative_to(RAW_ROOT).as_posix(),
         "sha256": sha256(path),
-        "byte": path.stat().st_size,
-        "data_utc": datetime.now(timezone.utc).isoformat(),
+        "bytes": size,
+        "retrieved_at": now,
+        "byte": size,
+        "data_utc": now,
         **extra,
     }
     with (RAW / "manifest.jsonl").open("a", encoding="utf-8") as stream:
@@ -197,23 +201,23 @@ def record(path, url, metadata, **extra):
 
 
 def download(
-    url, destinazione, dry_run=False, *, client=None, metadata=None, refresh=False, refresh_id=None
+    url, destination, dry_run=False, *, client=None, metadata=None, refresh=False, refresh_id=None
 ):
-    print("GET", url, "->", destinazione, flush=True)
+    print("GET", url, "->", destination, flush=True)
     if dry_run:
         return
     client = client or HttpClient(timeout=300)
     metadata = acquisition_manifest() if metadata is None else metadata
-    item = metadata.get(destinazione.relative_to(RAW_ROOT).as_posix(), {})
+    item = metadata.get(destination.relative_to(RAW_ROOT).as_posix(), {})
     if (
         not refresh
         and (refresh_id is None or item.get("refresh_id") == refresh_id)
-        and cached(destinazione, url, metadata)
+        and cached(destination, url, metadata)
     ):
         print("Verified UniProt cache reused", flush=True)
         return
-    destinazione.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destinazione.with_name(destinazione.name + ".part")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".part")
 
     def consume(response):
         with temporary.open("wb") as stream:
@@ -225,9 +229,9 @@ def download(
 
     try:
         count, headers = client.get(url, consume)
-        temporary.replace(destinazione)
+        temporary.replace(destination)
         record(
-            destinazione,
+            destination,
             url,
             metadata,
             records=count,

@@ -112,6 +112,9 @@ def test_bundle_migration_preserves_source_and_links(tmp_path):
     output = tmp_path / "output"
     changes = run(source, output, catalog)
     validate(output, "synthetic")
+    derived = json.loads((output / "manifest.json").read_text())["derivations"][-1]
+    assert derived["input_manifest_sha256"] == before["manifest.json"]
+    assert derived["enzyme_catalog_sha256"] == sha256(catalog)
     assert changes["PROTEIN_UNIPROT"] == 1
     assert next(rows(output, BY_NAME["PROTEIN_UNIPROT"]))["protein_name"] == "Protein (NAD(+))"
     assert (source / "protein_ec.tsv").read_bytes() == (output / "protein_ec.tsv").read_bytes()

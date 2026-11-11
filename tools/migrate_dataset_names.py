@@ -42,6 +42,11 @@ def run(source, destination, enzyme_catalog=RAW / "enzyme/enzyme.rdf.xz"):
             shutil.copyfile(source / old, stage / new)
             converted[new] = entry
         metadata["files"] = converted
+        metadata.setdefault("derivations", []).append({
+            "operation": "english-names-migration",
+            "input_manifest_sha256": sha256(source / "manifest.json"),
+            "script_sha256": sha256(__file__),
+        })
         (stage / "manifest.json").write_text(json.dumps(metadata, indent=2) + "\n")
         with (stage / "ec_number.tsv").open() as stream:
             old_annotations = next(tsv.reader(stream)) == ["ec_number"]

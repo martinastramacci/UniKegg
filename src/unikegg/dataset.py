@@ -45,7 +45,7 @@ def rows(directory, table):
             raise ValueError(f"Invalid TSV: {path.name}:{reader.line_num}: {error}") from error
 
 
-def manifest(directory, kind, reviewed=None):
+def manifest(directory, kind, reviewed=None, *, provenance=None, quality=None):
     """Verify the accession scope before declaring Swiss-Prot provenance."""
     if kind not in {"swissprot", "synthetic"}:
         raise ValueError("Unknown dataset kind")
@@ -72,6 +72,10 @@ def manifest(directory, kind, reviewed=None):
             sorted({row["kegg_code"] for row in rows(directory, BY_NAME["ORGANISM"])})
         ),
     }
+    if provenance is not None:
+        content["provenance"] = provenance
+    if quality is not None:
+        content["quality"] = quality
     destination = directory / "manifest.json"
     candidate = directory / f".unikegg-manifest-{uuid.uuid4().hex}.tmp"
     temporary = None

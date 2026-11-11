@@ -18,6 +18,7 @@ def main(argv=None):
             "history",
             "verify",
             "validate",
+            "quality",
             "transform",
             "manifest",
             "download-uniprot",
@@ -28,6 +29,7 @@ def main(argv=None):
     )
     parser.add_argument("--version-label", help="optional label for a committed load/update")
     parser.add_argument("--reviewed-export", type=Path)
+    parser.add_argument("--compare-to", type=Path, help="quality: previous processed dataset")
     parser.add_argument("--dry-run", action="store_true")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--organisms", help="comma-separated curated KEGG codes")
@@ -56,13 +58,15 @@ def main(argv=None):
     args = parser.parse_args(argv)
     downloading = args.command in {"download-uniprot", "download-kegg", "download-enzymes"}
     explicit = args.organisms is not None or args.limit is not None or args.all_organisms
+    if args.compare_to is not None and args.command != "quality":
+        parser.error("--compare-to is supported only by quality")
     if args.dry_run and not downloading and args.command != "update":
         parser.error("--dry-run is supported only by download commands and update")
     if explicit and args.command == "download-enzymes":
         parser.error("download-enzymes downloads the complete organism-independent catalog")
     if args.reviewed_export and args.command not in {"transform", "manifest"}:
         parser.error("--reviewed-export is supported only by transform and manifest")
-    if explicit and args.command in {"load", "verify", "validate", "update", "history"}:
+    if explicit and args.command in {"load", "verify", "validate", "update", "history", "quality"}:
         parser.error("This command uses the organism selection in the dataset manifest")
     if args.version_label is not None and args.command not in {"load", "update"}:
         parser.error("--version-label is supported only by load and update")
@@ -103,6 +107,10 @@ def main(argv=None):
         from unikegg.loader import run
 
         run(verify_only=args.command == "verify", version_label=args.version_label)
+    elif args.command == "quality":
+        from unikegg.quality import run
+
+        run(PROCESSED, args.compare_to)
     elif args.command == "validate":
         from unikegg.dataset import validate
 

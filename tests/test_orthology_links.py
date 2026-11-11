@@ -58,7 +58,13 @@ def test_direct_many_to_many_links_and_ec_only_in_ko(tmp_path):
     raw_tsv(raw / "relations/ko_pathway.tsv", reversed(pathway))
     raw_tsv(raw / "relations/ko_ec.tsv", reversed(ecs))
     assert command(tmp_path, "transform").returncode == 0
-    assert before == contents(output)
+    after = contents(output)
+    old_manifest = json.loads(before.pop("manifest.json"))
+    new_manifest = json.loads(after.pop("manifest.json"))
+    assert before == after
+    assert old_manifest["quality"] == new_manifest["quality"]
+    assert old_manifest["files"] == new_manifest["files"]
+    assert old_manifest["provenance"] != new_manifest["provenance"]
 
 
 @pytest.mark.parametrize(

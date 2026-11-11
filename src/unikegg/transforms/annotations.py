@@ -72,6 +72,12 @@ def run(source, destination, enzyme_catalog):
             metadata["files"][filename] = {"rows": count, "sha256": sha256(original)}
             changes[table["name"]] = changed
         metadata["enzyme_catalog_sha256"] = sha256(enzyme_catalog)
+        metadata.setdefault("derivations", []).append({
+            "operation": "annotation-migration",
+            "input_manifest_sha256": sha256(source / "manifest.json"),
+            "script_sha256": sha256(__file__),
+            "enzyme_catalog_sha256": metadata["enzyme_catalog_sha256"],
+        })
         (stage / "manifest.json").write_text(json.dumps(metadata, indent=2) + "\n")
         validate(stage, metadata["dataset_kind"])
         publish(stage, destination)

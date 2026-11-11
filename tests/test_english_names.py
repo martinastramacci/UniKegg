@@ -9,7 +9,7 @@ from tests.make_fixture import generate
 from tools.migrate_database_names import rename_plan
 from tools.migrate_dataset_names import run
 from tools.migrate_legacy_dump import source_dump_file
-from unikegg.dataset import TABLES, validate
+from unikegg.dataset import TABLES, sha256, validate
 from unikegg.legacy_names import LEGACY_TABLE_NAMES
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +35,9 @@ def test_dataset_conversion_preserves_source_and_all_tsv_bytes(tmp_path):
     before = legacy_bundle(source)
     run(source, output)
     validate(output, "synthetic")
+    derived = json.loads((output / "manifest.json").read_text())["derivations"][-1]
+    assert derived["operation"] == "english-names-migration"
+    assert derived["input_manifest_sha256"] == sha256(source / "manifest.json")
     assert before == {p.name: p.read_bytes() for p in source.iterdir()}
     reverse = {new: old for old, new in LEGACY_TABLE_NAMES.items()}
     for table in TABLES:

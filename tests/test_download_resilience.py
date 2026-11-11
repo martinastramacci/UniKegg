@@ -424,7 +424,7 @@ def test_detail_refresh_uses_only_active_index(tmp_path, monkeypatch):
             target.write_bytes(source.read_bytes())
 
     monkeypatch.setattr(kegg, "fetch", fake_fetch)
-    kegg.run(codes=["hsa"])
+    kegg.run(codes=["hsa"], refresh=True)
     records = list(detail_records(root / "details/reaction", {"R00001"}))
     assert len(records) == 1
     assert list(detail_records(root / "details/reaction", set())) == []
@@ -432,6 +432,23 @@ def test_detail_refresh_uses_only_active_index(tmp_path, monkeypatch):
     indexed.write_text(original + "damage")
     with pytest.raises(ValueError, match="checksum"):
         list(detail_records(root / "details/reaction", {"R00001"}))
+
+
+def test_kegg_detail_records_reused_across_batches_without_refetching(tmp_path, monkeypatch):
+    generate(tmp_path)
+    root = tmp_path / "data/raw/kegg"
+    monkeypatch.setattr(kegg, "ROOT", root)
+    calls = []
+
+    def fake_fetch(endpoint, relative, *args, **kwargs):
+        if endpoint.startswith("/get/"):
+            calls.append(endpoint)
+
+    monkeypatch.setattr(kegg, "fetch", fake_fetch)
+    kegg.run(codes=["hsa"])
+    assert calls == []
+    assert (root / "details/reaction/records/R00001.txt").is_file()
+    assert len(list(detail_records(root / "details/reaction", {"R00001"}))) == 1
 
 
 def test_pagination_link_can_contain_unescaped_field_commas():

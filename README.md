@@ -2,7 +2,7 @@
 
 For installations with previous Italian table or TSV names, first follow the [English naming migration](docs/english-names-migration.md).
 
-**Startup guides:** [English](docs/command-guide.md) · [Italiano](docs/command-guide.it.md). Choose a complete **Python + native MySQL + SQL** path or a **Docker + SQL** path, with explanations of every setup step. See the [command reference](docs/command-reference.md) ([Italiano](docs/command-reference.it.md)) for all CLI options and acquisition examples.
+**Startup guides:** [Command guide](docs/command-guide.md). Choose a complete **Python + native MySQL + SQL** path or a **Docker + SQL** path, with explanations of every setup step. See the [command reference](docs/command-reference.md) for all CLI options and acquisition examples.
 
 ## Overview & Engineering Objective
 
@@ -81,7 +81,7 @@ TSVs use UTF-8, tab separators, LF line endings and doubled internal quotes. New
 
 ## Native MySQL setup (without Docker)
 
-Docker is optional. The [native startup guide](docs/command-guide.md#a-python-and-sql-without-docker) ([Italiano](docs/command-guide.it.md#a-python-e-sql-senza-docker)) covers installing and starting MySQL, creating the database and application account, enabling `local_infile`, importing the three schema files, configuring the Python connection, acquiring/loading data and running SQL queries. Local Python does not start MySQL or create the schema automatically. Use port `3306` for the documented native server; the CLI defaults to `3307`, so export the native port explicitly.
+Docker is optional. The [native startup guide](docs/command-guide.md#a-python-and-sql-without-docker) covers installing and starting MySQL, creating the database and application account, enabling `local_infile`, importing the three schema files, configuring the Python connection, acquiring/loading data and running SQL queries. Local Python does not start MySQL or create the schema automatically. Use port `3306` for the documented native server; the CLI defaults to `3307`, so export the native port explicitly.
 
 ## Infrastructure Setup (Docker Compose)
 
@@ -120,6 +120,12 @@ For runtime-only use, install `requirements.txt` instead. The local CLI reads en
 GitHub Actions runs Ruff, SQLFluff with the MySQL dialect and unit tests, then starts both Compose services on an ephemeral runner. Integration uses invented fixtures covering all 22 domain tables and 16 organism codes. It tests automatic initialization, successful loading, verification and a repeated load. A separate, initially empty regression database tests warning-triggered rollback, concurrent loaders, all-field TSV/SQL round trips (including legacy literal `NULL` and long sequences), all 30 integration queries, full synchronization, preview, concurrent updates, rollback of data and history, and metadata migration on legacy databases. Unit tests cover raw transformation and fail-closed acquisition using invented data and mocked HTTP. CI tests Python 3.11/3.12 and audits Python dependencies. It does not download or publish upstream datasets.
 
 ## Updating an existing database
+
+For per-organism coverage, source agreement, mapping multiplicity and comparisons
+between datasets, run `unikegg quality` (optionally `--compare-to /previous/bundle`).
+New transformations embed quality metrics and raw/code provenance in the manifest.
+See [quality, provenance and performance](docs/quality-and-performance.md) for JSON
+reports, a read-only MySQL query benchmark and backup/restore verification.
 
 For a database created before the KO extension, first apply the [additive SQL migration](docs/orthology-migration.md). After preparing a new validated dataset, synchronize existing records without rebuilding MySQL:
 

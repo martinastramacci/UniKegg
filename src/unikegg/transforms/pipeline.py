@@ -13,6 +13,8 @@ from unikegg.acquire.reviewed import reviewed_rows
 from unikegg.config import RAW
 from unikegg.dataset import TABLES, manifest, validate
 from unikegg.organisms import recorded_selection, select, selection
+from unikegg.provenance import capture
+from unikegg.quality import metrics
 from unikegg.transforms import entities, relations
 
 
@@ -114,10 +116,22 @@ def _run(directory, reviewed_export=None):
         if reviewed_export is not None:
             os.environ["UNIKEGG_REVIEWED_DIR"] = str(Path(reviewed_export).resolve())
         try:
+            source_provenance = capture(
+                entities.RAW_KEGG,
+                Path(os.environ.get("UNIKEGG_REVIEWED_DIR", RAW / "uniprot")),
+            )
             entities.main()
             relations.main()
             reviewed = {row["Entry"] for row in reviewed_rows(reviewed_export)}
-            manifest(stage, "swissprot", reviewed)
+            if source_provenance != capture(
+                entities.RAW_KEGG,
+                Path(os.environ.get("UNIKEGG_REVIEWED_DIR", RAW / "uniprot")),
+            ):
+                raise ValueError("Sources or transformer changed during transformation")
+            manifest(
+                stage, "swissprot", reviewed,
+                provenance=source_provenance, quality=metrics(stage),
+            )
             _, fingerprint = validate(stage)
             if (directory / ".gitkeep").is_file():
                 shutil.copyfile(directory / ".gitkeep", stage / ".gitkeep")
